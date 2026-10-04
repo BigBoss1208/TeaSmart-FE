@@ -1,0 +1,10 @@
+{
+  "description": "Discover premium Thai Nguyen tea through an interactive e-commerce platform featuring AI recommendations and disease analysis for tea leaves.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

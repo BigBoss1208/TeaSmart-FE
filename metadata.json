@@ -1,0 +1,8 @@
+{
+  "name": "TeaSmart",
+  "description": "Discover premium Thai Nguyen tea through an interactive e-commerce platform featuring AI recommendations and disease analysis for tea leaves.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
