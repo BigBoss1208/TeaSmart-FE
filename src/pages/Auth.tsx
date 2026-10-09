@@ -1,3 +1,4 @@
+import { api, errorMessage, mapUser, type ApiUser } from "../lib/commerce";
 import { useState } from "react";
 import { User, Page } from "../types";
 import { Icon } from "../components/Icon";
@@ -19,83 +20,15 @@ export function LoginPage({
   const [error, setError] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPass = password.trim();
-
-    if (!cleanEmail || !cleanPass) {
-      setError("Vui lòng nhập đầy đủ Email và Mật khẩu.");
-      return;
-    }
-
-    // 1. Check Demo Admin
-    if (cleanEmail === "admin@teasmart.vn" && cleanPass === "admin123") {
-      const adminUser: User = {
-        id: "admin-1",
-        name: "Quản trị viên TeaSmart",
-        email: "admin@teasmart.vn",
-        phone: "0988 888 888",
-        role: "ADMIN",
-        joinDate: "01/2024"
-      };
-      onLogin(adminUser);
-      return;
-    }
-
-    // 2. Check Demo User
-    if (cleanEmail === "nguyenan@gmail.com" && cleanPass === "123456") {
-      const demoUser: User = {
-        id: "user-1",
-        name: "Nguyễn An",
-        email: "nguyenan@gmail.com",
-        phone: "0912 345 678",
-        role: "USER",
-        joinDate: "03/2024"
-      };
-      onLogin(demoUser);
-      return;
-    }
-
-    // 3. Check registered users list
-    const found = registeredUsers.find(
-      (u) => u.email.toLowerCase() === cleanEmail
-    );
-
-    if (found) {
-      // In prototype with local state, registered user credentials match
-      onLogin(found);
-      return;
-    }
-
-    // If user entered valid format but not in demo/registered, create account or check
-    if (cleanEmail.includes("@") && cleanPass.length >= 6) {
-      // Allow seamless prototype login as general user
-      const dynamicUser: User = {
-        id: `user-${Date.now()}`,
-        name: cleanEmail.split("@")[0].toUpperCase(),
-        email: cleanEmail,
-        role: "USER",
-        joinDate: "03/2026"
-      };
-      onLogin(dynamicUser);
-      return;
-    }
-
-    setError("Email hoặc Mật khẩu không chính xác. Mẹo: Dùng admin@teasmart.vn (mk: admin123) hoặc tài khoản khách hàng bên dưới.");
-  };
-
-  const handleFillDemo = (type: "admin" | "user") => {
-    if (type === "admin") {
-      setEmail("admin@teasmart.vn");
-      setPassword("admin123");
-    } else {
-      setEmail("nguyenan@gmail.com");
-      setPassword("123456");
-    }
-    setError("");
+  const [busy, setBusy] = useState(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); if (busy) return; setError(""); setBusy(true);
+    try {
+      const result = await api<{ accessToken: string; user: ApiUser }>("/auth/login", {
+        method: "POST", body: JSON.stringify({ email: email.trim(), password }) });
+      sessionStorage.setItem("teasmart_access_token", result.accessToken);
+      onLogin(mapUser(result.user));
+    } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   };
 
   return (
@@ -172,7 +105,7 @@ export function LoginPage({
               <button
                 type="button"
                 className="auth-link-subtle"
-                onClick={() => setForgotSent(true)}
+                onClick={() => setError("Chức năng khôi phục mật khẩu chưa được triển khai.")}
               >
                 Quên mật khẩu?
               </button>
@@ -198,7 +131,7 @@ export function LoginPage({
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary auth-submit-btn">
+          <button type="submit" disabled={busy} className="btn btn-primary auth-submit-btn">
             Đăng nhập <Icon name="arrow" size={15} />
           </button>
         </form>
@@ -211,28 +144,6 @@ export function LoginPage({
           </button>
         </div>
 
-        {/* Quick Demo Credentials Box for easy testing */}
-        <div className="auth-demo-box">
-          <span className="auth-demo-label">Tài khoản demo sẵn sàng:</span>
-          <div className="auth-demo-chips">
-            <button
-              type="button"
-              className="auth-demo-chip"
-              onClick={() => handleFillDemo("admin")}
-              title="admin@teasmart.vn / admin123"
-            >
-              🛡️ Quản trị viên (Admin)
-            </button>
-            <button
-              type="button"
-              className="auth-demo-chip"
-              onClick={() => handleFillDemo("user")}
-              title="nguyenan@gmail.com / 123456"
-            >
-              👤 Khách hàng (User)
-            </button>
-          </div>
-        </div>
       </div>
     </main>
   );
@@ -253,48 +164,19 @@ export function RegisterPage({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    // Validations
-    if (!name.trim()) {
-      setError("Vui lòng nhập Họ và tên.");
-      return;
+  const [busy, setBusy] = useState(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); if (busy) return; setError("");
+    if (password !== confirmPassword) { setError("Mật khẩu nhập lại không khớp."); return; }
+    if (password.length < 8 || new TextEncoder().encode(password).length > 72) {
+      setError("Mật khẩu cần ít nhất 8 ký tự và tối đa 72 byte UTF-8."); return;
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim() || !emailRegex.test(email.trim())) {
-      setError("Email không đúng định dạng. Ví dụ: ten@gmail.com");
-      return;
-    }
-
-    const cleanPhone = phone.trim().replace(/\s+/g, "");
-    if (!cleanPhone || cleanPhone.length < 9) {
-      setError("Vui lòng nhập số điện thoại hợp lệ (tối thiểu 9 số).");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Mật khẩu phải có ít nhất 6 ký tự.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Mật khẩu nhập lại không khớp. Vui lòng kiểm tra lại.");
-      return;
-    }
-
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      phone: cleanPhone,
-      role: "USER",
-      joinDate: new Date().toLocaleDateString("vi-VN", { month: "2-digit", year: "numeric" })
-    };
-
-    onRegisterSuccess(newUser);
+    setBusy(true);
+    try {
+      const user = await api<ApiUser>("/auth/register", { method: "POST", body: JSON.stringify({
+        fullName: name.trim(), email: email.trim(), phone: phone.trim().replace(/\s/g, ""), password }) });
+      onRegisterSuccess(mapUser(user));
+    } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   };
 
   return (
@@ -381,7 +263,7 @@ export function RegisterPage({
                   id="reg-pass"
                   type={showPassword ? "text" : "password"}
                   required
-                  placeholder="Tối thiểu 6 ký tự"
+                  placeholder="Tối thiểu 8 ký tự"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -413,7 +295,7 @@ export function RegisterPage({
             </button>
           </div>
 
-          <button type="submit" className="btn btn-primary auth-submit-btn">
+          <button type="submit" disabled={busy} className="btn btn-primary auth-submit-btn">
             Đăng ký tài khoản <Icon name="arrow" size={15} />
           </button>
         </form>

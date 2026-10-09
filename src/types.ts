@@ -4,6 +4,7 @@ export type Page =
   | "product"
   | "cart"
   | "checkout"
+  | "payment-return"
   | "ai"
   | "leaf"
   | "account"
@@ -38,6 +39,7 @@ export type AdminSubView =
   | "Statistics";
 
 export interface Product {
+  slug?: string;
   id: number;
   name: string;
   type: string; // "Chè Tân Cương" | "Chè xanh" | "Chè đặc sản" | "Quà tặng"
@@ -120,6 +122,8 @@ export interface OrderItem {
 }
 
 export interface Order {
+  backendId?: number;
+  paymentStatus?: string;
   id: string; // e.g. "#TS240608"
   customerName: string;
   customerPhone: string;

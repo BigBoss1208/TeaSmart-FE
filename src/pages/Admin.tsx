@@ -1,3 +1,4 @@
+import AdminPayments from "./AdminPayments";
 import { useState, useEffect } from "react";
 import { Product, Order, Category, Customer, Review, TeaRegion, TeaShop, AdminSubView, User } from "../types";
 import { Icon } from "../components/Icon";
@@ -758,59 +759,7 @@ export function AdminPortal({
         {/* ========================================================
             4. ORDERS VIEW (/admin/orders)
             ======================================================== */}
-        {view === "Orders" && (
-          <div className="admin-table">
-            <div className="admin-table-title">
-              <strong>Danh sách đơn hàng khách hàng</strong>
-              <span>Tổng số: {orders.length} đơn</span>
-            </div>
-            <div className="admin-table-responsive">
-              <div className="admin-th" style={{ gridTemplateColumns: "1fr 1.3fr 1fr 1.2fr 1fr 1.3fr" }}>
-                <span>Mã đơn</span>
-                <span>Khách hàng</span>
-                <span>Ngày đặt</span>
-                <span>Tổng tiền</span>
-                <span>Trạng thái</span>
-                <span>Cập nhật trạng thái</span>
-              </div>
-              {orders.map((ord) => (
-                <div className="admin-tr" style={{ gridTemplateColumns: "1fr 1.3fr 1fr 1.2fr 1fr 1.3fr", alignItems: "center" }} key={ord.id}>
-                  <span><strong>{ord.id}</strong></span>
-                  <span>
-                    <div>{ord.customerName}</div>
-                    <small style={{ color: "var(--muted)", fontSize: "9px" }}>{ord.customerPhone}</small>
-                  </span>
-                  <span>{ord.date}</span>
-                  <span><strong>{money(ord.total)}</strong></span>
-                  <span>
-                    <span className={`admin-badge ${ord.status === "Đã giao" ? "badge-success" : ord.status === "Đang giao" ? "badge-info" : ord.status === "Đã hủy" ? "badge-danger" : "badge-warning"}`}>
-                      {ord.status}
-                    </span>
-                  </span>
-                  <span style={{ display: "flex", gap: "6px" }}>
-                    <select
-                      className="admin-select-sm"
-                      value={ord.status}
-                      onChange={(e) => onUpdateOrderStatus(ord.id, e.target.value as Order["status"])}
-                    >
-                      <option value="Chờ xử lý">Chờ xử lý</option>
-                      <option value="Đã xác nhận">Đã xác nhận</option>
-                      <option value="Đang giao">Đang giao</option>
-                      <option value="Đã giao">Đã giao</option>
-                      <option value="Đã hủy">Đã hủy</option>
-                    </select>
-                    <button
-                      className="admin-action-btn"
-                      onClick={() => setShowOrderModal(ord)}
-                    >
-                      Chi tiết
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {view === "Orders" && <AdminPayments />}
 
         {/* ========================================================
             5. CUSTOMERS VIEW (/admin/customers)

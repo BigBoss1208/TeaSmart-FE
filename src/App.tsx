@@ -1,3 +1,6 @@
+import PaymentCheckout from "./pages/PaymentCheckout";
+import PaymentReturn from "./pages/PaymentReturn";
+import { api, errorMessage, mapUser, mapProduct, mapCart, mapOrder, type ApiUser, type ApiProduct, type ApiPage, type ApiCart, type ApiOrder, type CartLine } from "./lib/commerce";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Product, Page, Order, Category, Customer, Review, TeaRegion, TeaShop, User, AdminSubView } from "./types";
 import {
@@ -769,7 +772,7 @@ function ProductDetail({
 
           <div className="option-label">Chọn khối lượng</div>
           <div className="weight-options">
-            {["100g", "200g", "500g"].map((w) => (
+            {[product.weight].map((w) => (
               <button
                 key={w}
                 className={weight === w ? "active" : ""}
@@ -991,18 +994,18 @@ function ProductDetail({
    ======================================================== */
 function Cart({
   cart,
-  setCart,
+  updateCart,
   navigate
 }: {
-  cart: { product: Product; qty: number }[];
-  setCart: React.Dispatch<React.SetStateAction<{ product: Product; qty: number }[]>>;
+  cart: CartLine[];
+  updateCart: (id: number, quantity: number | null) => Promise<void>;
   navigate: (p: Page) => void;
 }) {
   const total = cart.reduce((s, x) => s + x.product.price * x.qty, 0);
-  const qty = (id: number, delta: number) =>
-    setCart((c) =>
-      c.map((x) => (x.product.id === id ? { ...x, qty: Math.max(1, x.qty + delta) } : x))
-    );
+  const qty = (id: number, delta: number) => {
+    const item = cart.find(x => x.product.id === id);
+    if (item) void updateCart(id, Math.max(1, item.qty + delta));
+  };
 
   return (
     <main className="page simple-page">
@@ -1031,7 +1034,7 @@ function Cart({
                   <small>{x.product.type}</small>
                   <strong>{x.product.name}</strong>
                   <span>{x.product.weight}</span>
-                  <button onClick={() => setCart((c) => c.filter((i) => i.product.id !== x.product.id))}>
+                  <button onClick={() => void updateCart(x.product.id, null)}>
                     <Icon name="trash" size={16} /> Xóa
                   </button>
                 </div>
@@ -1060,7 +1063,7 @@ function Cart({
           </div>
           <div>
             <span>Phí vận chuyển</span>
-            <strong>{total >= 500000 || total === 0 ? "Miễn phí" : "30.000₫"}</strong>
+            <strong>{"Miễn phí"}</strong>
           </div>
           <div className="coupon">
             <input placeholder="Mã ưu đãi" />
@@ -1068,129 +1071,12 @@ function Cart({
           </div>
           <div className="total">
             <span>Tổng cộng</span>
-            <strong>{money(total + (total >= 500000 || total === 0 ? 0 : 30000))}</strong>
+            <strong>{money(total)}</strong>
           </div>
           <Button onClick={() => navigate("checkout")} disabled={total === 0}>
             Thanh toán <Icon name="arrow" />
           </Button>
           <small>Thanh toán an toàn · Bảo mật thông tin</small>
-        </aside>
-      </div>
-    </main>
-  );
-}
-
-function Checkout({
-  cart,
-  onOrderPlaced
-}: {
-  cart: { product: Product; qty: number }[];
-  onOrderPlaced?: (newOrder: Order) => void;
-}) {
-  const [done, setDone] = useState(false);
-  const [name, setName] = useState("Nguyễn Văn An");
-  const [phone, setPhone] = useState("0912 345 678");
-  const [email, setEmail] = useState("nguyenan@email.com");
-  const [address, setAddress] = useState("Số 18 Hoàng Hoa Thám, Ba Đình, Hà Nội");
-  const [payment, setPayment] = useState("Thanh toán khi nhận hàng (COD)");
-
-  const total = cart.reduce((s, x) => s + x.product.price * x.qty, 0);
-
-  const handleCompleteOrder = () => {
-    const orderId = `#TS${Math.floor(100000 + Math.random() * 900000)}`;
-    const newOrder: Order = {
-      id: orderId,
-      customerName: name,
-      customerPhone: phone,
-      customerEmail: email,
-      shippingAddress: address,
-      items: cart,
-      total: total,
-      date: new Date().toLocaleDateString("vi-VN"),
-      status: "Chờ xử lý",
-      paymentMethod: payment
-    };
-    onOrderPlaced?.(newOrder);
-    setDone(true);
-  };
-
-  if (done) {
-    return (
-      <main className="page checkout-success">
-        <span><Icon name="check" size={36} /></span>
-        <div className="detail-title">Đặt hàng thành công</div>
-        <p>Cảm ơn bạn đã lựa chọn TeaSmart. Đơn hàng của bạn đã được ghi nhận vào hệ thống.</p>
-        <Button onClick={() => setDone(false)}>Về trang chủ</Button>
-      </main>
-    );
-  }
-
-  return (
-    <main className="page simple-page checkout-page">
-      <div className="checkout-brand">
-        <Icon name="leaf" /> TeaSmart <span>Thanh toán an toàn</span>
-      </div>
-      <div className="checkout-grid">
-        <div>
-          <section className="form-section">
-            <div className="form-title">
-              <span>1</span>Thông tin giao hàng
-            </div>
-            <div className="form-grid">
-              <label>Họ và tên<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-              <label>Số điện thoại<input value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
-              <label className="full">Email<input value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-              <label className="full">Địa chỉ giao hàng<input value={address} onChange={(e) => setAddress(e.target.value)} /></label>
-            </div>
-          </section>
-
-          <section className="form-section">
-            <div className="form-title">
-              <span>2</span>Phương thức thanh toán
-            </div>
-            <div className="payments">
-              {[
-                "Thanh toán khi nhận hàng (COD)",
-                "Chuyển khoản ngân hàng",
-                "Thanh toán trực tuyến"
-              ].map((x) => (
-                <label key={x} className={payment === x ? "active" : ""}>
-                  <input
-                    type="radio"
-                    checked={payment === x}
-                    onChange={() => setPayment(x)}
-                    name="pay"
-                  />
-                  <span>
-                    <strong>{x}</strong>
-                    <small>{x.includes("COD") ? "Kiểm tra hàng trước khi thanh toán" : "Nhanh chóng và bảo mật"}</small>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <aside className="checkout-summary">
-          <div className="summary-title">Đơn hàng của bạn</div>
-          {cart.map((x) => (
-            <div className="checkout-item" key={x.product.id}>
-              <img src={x.product.image} alt="" />
-              <span>
-                <strong>{x.product.name}</strong>
-                <small>{x.product.weight} · SL {x.qty}</small>
-              </span>
-              <b>{money(x.product.price * x.qty)}</b>
-            </div>
-          ))}
-          <div className="summary-lines">
-            <div><span>Tạm tính</span><b>{money(total)}</b></div>
-            <div><span>Vận chuyển</span><b>Miễn phí</b></div>
-            <div><strong>Tổng cộng</strong><strong>{money(total)}</strong></div>
-          </div>
-          <Button onClick={handleCompleteOrder} disabled={cart.length === 0}>
-            Hoàn tất đặt hàng <Icon name="check" />
-          </Button>
         </aside>
       </div>
     </main>
@@ -1218,6 +1104,8 @@ function AIConsultant({
     const match = products.find((p) => p.taste.some((t) => t.toLowerCase().includes(choice.toLowerCase())));
     return match || products[0];
   }, [choice, products]);
+
+  if (!matchedProduct) return <main className="page simple-page"><p>Đang tải danh mục sản phẩm.</p></main>;
 
   return (
     <main className="page ai-page">
@@ -1613,7 +1501,7 @@ function Account({
                     <img src={ord.items[0]?.product.image || photos.tea} alt="" />
                     <span>
                       <strong>{ord.items[0]?.product.name || "Sản phẩm chè"}</strong>
-                      <small>{ord.items.length} mặt hàng · {ord.paymentMethod}</small>
+                      <small>{ord.items.length} mặt hàng · {ord.paymentMethod} · {ord.paymentStatus}</small>
                     </span>
                     <strong>{money(ord.total)}</strong>
                   </div>
@@ -1803,6 +1691,7 @@ function getInitialRoute(): { page: Page; adminSubView: AdminSubView } {
     return { page: "home", adminSubView: "Dashboard" };
   }
   const path = window.location.pathname;
+  if (path === "/payment/vnpay-return") return { page: "payment-return", adminSubView: "Dashboard" };
   if (path === "/dang-nhap" || path === "/login") {
     return { page: "login", adminSubView: "Dashboard" };
   }
@@ -1867,6 +1756,8 @@ function getPathForPage(p: Page, adminSubView?: AdminSubView): string {
       return "/shops";
     case "cart":
       return "/cart";
+    case "payment-return":
+      return "/payment/vnpay-return";
     case "checkout":
       return "/checkout";
     case "ai":
@@ -1892,24 +1783,16 @@ export default function App() {
   const [page, setPage] = useState<Page>(initialRoute.page);
   const [adminSubView, setAdminSubView] = useState<AdminSubView>(initialRoute.adminSubView);
 
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [regions, setRegions] = useState<TeaRegion[]>(teaRegionsData);
   const [shops, setShops] = useState<TeaShop[]>(teaShopsData);
 
   // Authentication state
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem("teasmart_current_user");
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [registeredUsers, setRegisteredUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem("teasmart_registered_users");
@@ -1926,7 +1809,8 @@ export default function App() {
   const [selectedShopId, setSelectedShopId] = useState<string>("htx-hao-dat");
 
   // State: Cart & Wishlist
-  const [cart, setCart] = useState<{ product: Product; qty: number }[]>([]);
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [commerceError, setCommerceError] = useState("");
   const [favorites, setFavorites] = useState<number[]>([1, 4]); // Initial favorited products
 
   const navigate = (p: Page, subView?: AdminSubView) => {
@@ -1952,18 +1836,11 @@ export default function App() {
   }, []);
 
   const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    try {
-      localStorage.setItem("teasmart_current_user", JSON.stringify(user));
-    } catch {
-      // ignore
-    }
-    setAuthSuccessMsg("");
-    if (user.role === "ADMIN") {
-      navigate("admin", "Dashboard");
-    } else {
-      navigate("home");
-    }
+    setCurrentUser(user); setAuthSuccessMsg("");
+    const returnPath = sessionStorage.getItem("teasmart_payment_return");
+    if (user.role === "USER" && returnPath?.startsWith("/payment/vnpay-return?")) {
+      sessionStorage.removeItem("teasmart_payment_return"); window.history.replaceState(null, "", returnPath); setPage("payment-return");
+    } else navigate(user.role === "ADMIN" ? "admin" : "home", "Dashboard");
   };
 
   const handleRegisterSuccess = (newUser: User) => {
@@ -1982,6 +1859,9 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setCart([]); setOrders([]);
+    sessionStorage.removeItem("teasmart_access_token");
+    sessionStorage.removeItem("teasmart_checkout");
     try {
       localStorage.removeItem("teasmart_current_user");
     } catch {
@@ -1990,22 +1870,55 @@ export default function App() {
     navigate("login");
   };
 
-  const addToCart = (product: Product, weight?: string) => {
-    setCart((current) => {
-      const found = current.find((x) => x.product.id === product.id);
-      if (found) {
-        return current.map((x) =>
-          x.product.id === product.id ? { ...x, qty: x.qty + 1 } : x
-        );
+  async function refreshCart() { setCart(mapCart(await api<ApiCart>("/cart"))); }
+  const addToCart = async (product: Product, _weight?: string) => {
+    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return false; }
+    if (!products.some(p => p.id === product.id && p.name === product.name)) {
+      setCommerceError("Sản phẩm này chưa có trong danh mục bán hàng hiện tại."); return false;
+    }
+    try {
+      setCart(mapCart(await api<ApiCart>("/cart/items", { method: "POST", body: JSON.stringify({ productId: product.id, quantity: 1 }) })));
+      setCommerceError(""); return true;
+    } catch (e) { setCommerceError(errorMessage(e)); return false; }
+  };
+  const handleBuyNow = async (product: Product, weight?: string) => {
+    if (await addToCart(product, weight)) navigate("checkout");
+  };
+  const updateCart = async (productId: number, quantity: number | null) => {
+    const item = cart.find(x => x.product.id === productId);
+    if (!item?.cartItemId) return;
+    try {
+      await api(`/cart/items/${item.cartItemId}`, quantity === null ? { method: "DELETE" }
+        : { method: "PUT", body: JSON.stringify({ quantity }) });
+      await refreshCart(); setCommerceError("");
+    } catch (e) { setCommerceError(errorMessage(e)); }
+  };
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const first = await api<ApiPage<ApiProduct>>("/products?size=50");
+        const rest = await Promise.all(Array.from({ length: Math.max(0, first.totalPages - 1) }, (_, i) =>
+          api<ApiPage<ApiProduct>>(`/products?size=50&page=${i + 1}`)));
+        if (live) setProducts([first, ...rest].flatMap(p => p.content).map(mapProduct));
+      } catch (e) { if (live) setCommerceError(errorMessage(e)); }
+      if (sessionStorage.getItem("teasmart_access_token")) {
+        try { const user = mapUser(await api<ApiUser>("/users/me")); if (live) setCurrentUser(user); }
+        catch { sessionStorage.removeItem("teasmart_access_token"); }
       }
-      return [...current, { product: { ...product, weight: weight || product.weight }, qty: 1 }];
-    });
-  };
-
-  const handleBuyNow = (product: Product, weight?: string) => {
-    addToCart(product, weight);
-    navigate("checkout");
-  };
+    })(); return () => { live = false; };
+  }, []);
+  useEffect(() => {
+    let live = true;
+    if (currentUser?.role === "USER") {
+      void api<ApiCart>("/cart").then(c => { if (live) setCart(mapCart(c)); }).catch(e => { if (live) setCommerceError(errorMessage(e)); });
+      void api<ApiPage<{ orderId: number }>>("/orders?size=50").then(async result => {
+        const details = await Promise.all(result.content.map(o => api<ApiOrder>(`/orders/${o.orderId}`)));
+        if (live) setOrders(details.map(mapOrder));
+      }).catch(e => { if (live) setCommerceError(errorMessage(e)); });
+    }
+    return () => { live = false; };
+  }, [currentUser?.id, page]);
 
   const toggleFavorite = (productId: number) => {
     setFavorites((prev) =>
@@ -2144,6 +2057,7 @@ export default function App() {
 
   // Admin view (/admin and sub-routes)
   if (page === "admin") {
+    if (currentUser?.role !== "ADMIN") return <main className="page simple-page"><p>Vui lòng đăng nhập tài khoản quản trị viên.</p><Button onClick={() => navigate("login")}>Đăng nhập</Button></main>;
     return (
       <AdminPortal
         products={products}
@@ -2215,7 +2129,8 @@ export default function App() {
         />
       )}
 
-      {page === "product" && (
+      {commerceError && <p className="page" role="alert">{commerceError}</p>}
+      {page === "product" && currentProduct && (
         <ProductDetail
           product={currentProduct}
           onAddToCart={addToCart}
@@ -2275,11 +2190,13 @@ export default function App() {
       )}
 
       {page === "cart" && (
-        <Cart cart={cart} setCart={setCart} navigate={navigate} />
+        <Cart cart={cart} updateCart={updateCart} navigate={navigate} />
       )}
 
+      {page === "payment-return" && <PaymentReturn navigate={navigate} />}
+
       {page === "checkout" && (
-        <Checkout cart={cart} onOrderPlaced={handleOrderPlaced} />
+        <PaymentCheckout key={String(currentUser?.id)} cart={cart} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
       )}
 
       {page === "ai" && (
