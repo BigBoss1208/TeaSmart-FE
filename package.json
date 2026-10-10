@@ -10,7 +10,8 @@
     "lint": "tsc --noEmit",
     "format": "oxfmt",
     "test:payment": "node --experimental-transform-types --test tests/payment.test.ts",
-    "test:admin": "node --experimental-transform-types --test tests/admin.test.ts"
+    "test:admin": "node --experimental-transform-types --test tests/admin.test.ts",
+    "test:advisor": "node --experimental-transform-types --test tests/advisor.test.ts"
   },
   "dependencies": {
     "react": "^19.0.0",

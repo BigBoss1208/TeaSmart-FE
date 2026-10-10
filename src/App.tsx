@@ -1,3 +1,5 @@
+import TeaAdvisor from "./pages/TeaAdvisor";
+import TeaRecommendations from "./components/TeaRecommendations";
 import PaymentCheckout from "./pages/PaymentCheckout";
 import PaymentReturn from "./pages/PaymentReturn";
 import { api, errorMessage, mapUser, mapProduct, mapCart, mapOrder, type ApiUser, type ApiProduct, type ApiPage, type ApiCart, type ApiOrder, type CartLine } from "./lib/commerce";
@@ -99,7 +101,7 @@ function Home({
   onSelectShop: (id: string) => void;
 }) {
   const [taste, setTaste] = useState("Hậu ngọt");
-  const recommended = products.filter((p) => p.taste.includes(taste)).slice(0, 3);
+  const recommendationProfile: Record<string, string> = { "Đậm vị": "STRONG", "Ít chát": "LOW_ASTRINGENCY", "Hậu ngọt": "SWEET", "Hương thơm": "AROMATIC", "Uống hằng ngày": "DAILY", "Làm quà": "GIFT" };
 
   const heroSlides = useMemo(() => [
     {
@@ -305,18 +307,7 @@ function Home({
               ))}
             </div>
             <div className="mini-recommend">
-              <div className="mini-label">Gợi ý dành riêng cho bạn</div>
-              {(recommended.length ? recommended : products.slice(0, 3)).map((p) => (
-                <button key={p.id} onClick={() => onSelectProduct(p)}>
-                  <img src={p.image} alt="" />
-                  <span>
-                    <strong>{p.name}</strong>
-                    <small>{p.note}</small>
-                  </span>
-                  <b>{money(p.price)}</b>
-                  <Icon name="chevron" size={17} />
-                </button>
-              ))}
+              <TeaRecommendations profile={recommendationProfile[taste]} compact onSelectProduct={onSelectProduct} onAddToCart={onAddToCart} />
             </div>
           </div>
         </section>
@@ -735,14 +726,14 @@ function ProductDetail({
       <section className="detail">
         <div className="gallery">
           <div className="thumbs">
-            {(p.gallery && p.gallery.length > 0 ? p.gallery : [p.image, photos.cup, photos.leaf]).map((im, i) => (
+            {(p.gallery && p.gallery.length > 0 ? p.gallery : [p.image, photos.cup, photos.leaf]).filter(Boolean).map((im, i) => (
               <button key={i} className={i === 0 ? "active" : ""}>
                 <img src={im} alt="" />
               </button>
             ))}
           </div>
           <div className="main-photo">
-            <img src={p.image} alt={p.name} />
+            {p.image ? <img src={p.image} alt={p.name} /> : <p>Chưa có ảnh sản phẩm</p>}
             <span>{p.regionName || "Đặc sản Thái Nguyên"}</span>
           </div>
         </div>
@@ -965,26 +956,7 @@ function ProductDetail({
         </div>
       </section>
 
-      {/* Related Products */}
-      <section className="section related">
-        <SectionTitle eyebrow="Có thể bạn sẽ thích" title="Khám phá thêm hương vị" />
-        <div className="product-grid">
-          {initialProducts.filter((x) => x.id !== p.id).slice(0, 4).map((x) => (
-            <ProductCard
-              key={x.id}
-              product={x}
-              onView={() => {
-                onSelectProduct(x);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              onAdd={() => onAddToCart(x)}
-              onBuyNow={onBuyNow ? () => onBuyNow(x) : undefined}
-              isFavorite={favorites.includes(x.id)}
-              onToggleFavorite={() => onToggleFavorite(x.id)}
-            />
-          ))}
-        </div>
-      </section>
+      <TeaRecommendations productId={p.id} onSelectProduct={onSelectProduct} onAddToCart={onAddToCart} />
     </main>
   );
 }
@@ -1086,134 +1058,7 @@ function Cart({
 /* ========================================================
    AI TEA CONSULTANT (Intact as requested in Section 13)
    ======================================================== */
-function AIConsultant({
-  navigate,
-  onAddToCart,
-  products,
-  onSelectProduct
-}: {
-  navigate: (p: Page) => void;
-  onAddToCart: (p: Product) => void;
-  products: Product[];
-  onSelectProduct: (p: Product) => void;
-}) {
-  const [choice, setChoice] = useState<string | null>(null);
 
-  const matchedProduct = useMemo(() => {
-    if (!choice) return products[0];
-    const match = products.find((p) => p.taste.some((t) => t.toLowerCase().includes(choice.toLowerCase())));
-    return match || products[0];
-  }, [choice, products]);
-
-  if (!matchedProduct) return <main className="page simple-page"><p>Đang tải danh mục sản phẩm.</p></main>;
-
-  return (
-    <main className="page ai-page">
-      <aside className="ai-side">
-        <div>
-          <span><Icon name="spark" /></span>
-          <strong>TeaSmart AI</strong>
-          <small>Trợ lý chọn trà của bạn</small>
-        </div>
-        <button className="active"><Icon name="bot" /> Cuộc trò chuyện mới</button>
-        <button onClick={() => navigate("leaf")}><Icon name="camera" /> Phân tích lá chè</button>
-        <div className="ai-help">AI đưa ra gợi ý dựa trên thông tin bạn cung cấp, không thay thế tư vấn chuyên môn.</div>
-      </aside>
-
-      <section className="ai-conversation">
-        <div className="ai-top">
-          <div>
-            <strong>TeaSmart AI</strong>
-            <small><i /> Sẵn sàng hỗ trợ</small>
-          </div>
-          <button onClick={() => setChoice(null)}>Làm mới</button>
-        </div>
-
-        <div className="messages">
-          <div className="welcome-orb"><Icon name="leaf" size={32} /></div>
-          <div className="message-title">Chào bạn, mình là TeaSmart AI</div>
-          <p className="message-intro">Mình sẽ giúp bạn tìm ra loại chè phù hợp nhất với khẩu vị và nhu cầu.</p>
-
-          {/* Feature Card: AI Leaf Recognition inside AI Tư vấn */}
-          <div className="ai-leaf-feature-card">
-            <div className="ai-leaf-feature-content">
-              <span className="ai-leaf-feature-badge">Mới · Thị giác máy tính</span>
-              <strong>AI Nhận diện sâu bệnh lá chè</strong>
-              <p>Chẩn đoán sức khỏe nương chè, phát hiện sớm dấu hiệu bệnh qua ảnh chụp.</p>
-            </div>
-            <Button
-              variant="outline"
-              className="ai-leaf-feature-btn"
-              onClick={() => navigate("leaf")}
-            >
-              <Icon name="camera" size={15} /> Thử nhận diện lá chè
-            </Button>
-          </div>
-
-          <div className="bubble-row">
-            <span className="avatar"><Icon name="bot" /></span>
-            <div className="bubble ai">Xin chào! Tôi có thể giúp bạn tìm loại chè phù hợp. Bạn thích vị chè như thế nào?</div>
-          </div>
-
-          <div className="ai-quick">
-            {["Đậm vị", "Ít chát", "Hậu ngọt", "Uống hằng ngày", "Mua làm quà"].map((c) => (
-              <button
-                key={c}
-                className={choice === c ? "selected" : ""}
-                onClick={() => setChoice(c)}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-
-          {choice && (
-            <>
-              <div className="bubble-row user-row">
-                <div className="bubble user">Mình đang tìm loại chè {choice.toLowerCase()}.</div>
-              </div>
-              <div className="bubble-row">
-                <span className="avatar"><Icon name="bot" /></span>
-                <div className="bubble ai">
-                  Dựa trên sở thích “{choice}”, mình gợi ý bạn dòng trà {matchedProduct.name}. Hương vị cân bằng, tinh tuyển từ vùng nguyên liệu Thái Nguyên và có hậu ngọt tự nhiên kéo dài.
-                </div>
-              </div>
-              <div className="ai-product">
-                <img src={matchedProduct.image} alt="" />
-                <div>
-                  <small>Gợi ý phù hợp 96% theo khẩu vị</small>
-                  <strong>{matchedProduct.name}</strong>
-                  <span>{matchedProduct.note}</span>
-                  <b>{money(matchedProduct.price)}</b>
-                  <div>
-                    <Button variant="outline" onClick={() => onSelectProduct(matchedProduct)}>
-                      Xem sản phẩm
-                    </Button>
-                    <Button onClick={() => onAddToCart(matchedProduct)}>
-                      Thêm vào giỏ
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="ai-compose">
-          <div>
-            Nhập câu trả lời của bạn…
-            <button><Icon name="arrow" /></button>
-          </div>
-          <small>TeaSmart AI đưa ra gợi ý tham khảo theo khẩu vị. Hãy chọn sản phẩm yêu thích của bạn.</small>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-/* ========================================================
-   AI LEAF DISEASE CLASSIFICATION (Intact as requested in Section 13)
-   ======================================================== */
 function LeafDisease() {
   const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -2200,10 +2045,10 @@ export default function App() {
       )}
 
       {page === "ai" && (
-        <AIConsultant
+        <TeaAdvisor
           navigate={navigate}
           onAddToCart={addToCart}
-          products={products}
+          customer={currentUser?.role === "USER"}
           onSelectProduct={handleSelectProduct}
         />
       )}

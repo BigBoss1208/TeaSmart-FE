@@ -41,10 +41,12 @@ export function ProductCard({
 
   return (
     <article className="product-card">
-      <button className="product-image" onClick={onView} aria-label={`Xem chi tiết ${product.name}`}>
-        <img src={product.image} alt={product.name} loading="lazy" />
+      <div className="product-image">
+        <button onClick={onView} aria-label={`Xem chi tiết ${product.name}`} style={{ width: "100%", height: "100%", border: 0, padding: 0, background: "transparent" }}>
+          {product.image ? <img src={product.image} alt={product.name} loading="lazy" /> : <span>Chưa có ảnh sản phẩm</span>}
+        </button>
         <span className="tag">{product.type}</span>
-        <button
+        {onToggleFavorite && <button
           type="button"
           className={`heart ${isFavorite ? "active" : ""}`}
           onClick={(e) => {
@@ -54,12 +56,12 @@ export function ProductCard({
           aria-label={isFavorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
         >
           <Icon name="heart" size={18} />
-        </button>
-      </button>
+        </button>}
+      </div>
       <div className="product-info">
-        <div className="rating">
-          ★★★★★ <span>{product.rating} ({product.reviewsCount || 85})</span>
-        </div>
+        {product.reviewsCount !== undefined && <div className="rating">
+          {product.reviewsCount > 0 ? <span>★ {product.rating} ({product.reviewsCount})</span> : <span>Chưa có đánh giá</span>}
+        </div>}
         <button className="product-name" onClick={onView}>
           {product.name}
         </button>

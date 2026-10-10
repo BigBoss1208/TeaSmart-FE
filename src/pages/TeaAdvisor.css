@@ -1,0 +1,14 @@
+.tea-advisor .tea-preferences { padding: 1rem 1.5rem; border-bottom: 1px solid #d9e4dd; }
+.tea-filter-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: .75rem; }
+.tea-filter-grid label { display: grid; gap: .25rem; font-size: .85rem; }
+.tea-filter-grid input,.tea-filter-grid select,.tea-advisor textarea { padding: .65rem; border: 1px solid #bccfc3; border-radius: 8px; background: white; color: #193c29; width: 100%; }
+.tea-advisor .tea-reply { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tea-advisor .ai-conversation { min-width: 0; }
+.tea-advisor .ai-compose textarea { min-height: 75px; margin: .5rem 0; }
+.tea-advisor .ai-product { margin: 1rem 0; }
+.tea-reason { color: #506b5c; font-size: .85rem; margin: .65rem 0; }
+@media(max-width:700px) { .tea-advisor { display: block; } .tea-advisor .ai-side { width: 100%; padding: 1rem; } .tea-advisor .ai-product { flex-wrap: wrap; } .tea-advisor .ai-product img { width: 100%; max-height: 200px; object-fit: contain; } }
+
+.tea-recommendations.compact h2 { font-size: 1rem; }
+.tea-recommendations.compact .tea-reason { font-size: .75rem; }
+.tea-recommendation-list { display: grid; gap: .5rem; }
