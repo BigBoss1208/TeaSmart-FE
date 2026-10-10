@@ -1,0 +1,18 @@
+ .admin-data { min-width: 0; }
+.admin-data-filters { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:16px 0; }
+.admin-data-filters label { display:grid; gap:6px; flex:1 1 180px; }
+.admin-data-filters input,.admin-data-filters select { padding:10px; border:1px solid var(--line); background:var(--paper); width:100%; box-sizing:border-box; }
+.admin-data .kpis { margin:20px 0; }
+.admin-data .chart-card { margin:20px 0; }
+.admin-revenue-chart { display:block; width:100%; height:auto; min-height:160px; }
+.admin-status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; }
+.admin-status-grid div { display:grid; gap:8px; padding:12px; background:var(--paper); border:1px solid var(--line); }
+.admin-status-grid strong { font-size:24px; }
+.admin-data-scroll { overflow-x:auto; width:100%; }
+.admin-data table { width:100%; border-collapse:collapse; text-align:left; }
+.admin-data th,.admin-data td { padding:12px; border-bottom:1px solid var(--line); }
+.admin-data td { overflow-wrap:anywhere; min-width:90px; }
+.admin-data-pagination { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:20px; }
+.admin-customer-detail dl { display:grid; grid-template-columns:minmax(100px,1fr) 3fr; gap:8px; }
+.admin-customer-detail dd { margin:0; overflow-wrap:anywhere; }
+@media(max-width:640px) { .admin-data-filters { align-items:stretch; } .admin-data-filters button { flex:1 1 130px; } .admin-data .kpis { grid-template-columns:1fr 1fr; } .admin-data .kpis strong { font-size:20px; overflow-wrap:anywhere; } .admin-customer-detail dl { grid-template-columns:1fr; } }

@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "lint": "tsc --noEmit",
     "format": "oxfmt",
-    "test:payment": "node --experimental-transform-types --test tests/payment.test.ts"
+    "test:payment": "node --experimental-transform-types --test tests/payment.test.ts",
+    "test:admin": "node --experimental-transform-types --test tests/admin.test.ts"
   },
   "dependencies": {
     "react": "^19.0.0",

@@ -1,3 +1,5 @@
+import AdminOverview from "./AdminOverview";
+import AdminCustomers from "./AdminCustomers";
 import AdminPayments from "./AdminPayments";
 import { useState, useEffect } from "react";
 import { Product, Order, Category, Customer, Review, TeaRegion, TeaShop, AdminSubView, User } from "../types";
@@ -513,105 +515,7 @@ export function AdminPortal({
         {/* ========================================================
             1. DASHBOARD VIEW (/admin)
             ======================================================== */}
-        {view === "Dashboard" && (
-          <div className="admin-view-content">
-            <div className="kpis">
-              <div>
-                <span>Doanh thu tháng</span>
-                <strong>428.500.000₫</strong>
-                <small>+14.8% so với tháng trước</small>
-              </div>
-              <div>
-                <span>Đơn hàng</span>
-                <strong>{orders.length + 328}</strong>
-                <small>+8.2% đơn thành công</small>
-              </div>
-              <div>
-                <span>Khách hàng</span>
-                <strong>{customers.length + 1840}</strong>
-                <small>+18.4% khách hàng mới</small>
-              </div>
-              <div>
-                <span>Sản phẩm kinh doanh</span>
-                <strong>{products.length}</strong>
-                <small>Tất cả đang lưu hành</small>
-              </div>
-            </div>
-
-            <div className="chart-row">
-              <div className="chart-card">
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                  <strong>Biểu đồ doanh thu tuần qua</strong>
-                  <span>Đơn vị: Triệu VNĐ</span>
-                </div>
-                <div className="chart">
-                  <div className="chart-line" />
-                  <div className="chart-grid">
-                    {[1, 2, 3, 4].map((x) => (
-                      <i key={x} />
-                    ))}
-                  </div>
-                  <div className="chart-labels">
-                    <span>T2 (14.2M)</span>
-                    <span>T3 (18.5M)</span>
-                    <span>T4 (12.8M)</span>
-                    <span>T5 (24.1M)</span>
-                    <span>T6 (21.3M)</span>
-                    <span>T7 (32.4M)</span>
-                    <span>CN (28.6M)</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="chart-card best">
-                <strong>Sản phẩm bán chạy nhất</strong>
-                {products.slice(0, 4).map((p, i) => (
-                  <div key={p.id} className="best-item">
-                    <span>0{i + 1}</span>
-                    <img src={p.image} alt={p.name} />
-                    <div>
-                      <b>{p.name}</b>
-                      <small>{140 - i * 25} gói đã bán</small>
-                    </div>
-                    <strong>{money(p.price)}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Orders table */}
-            <div className="admin-table">
-              <div className="admin-table-title">
-                <strong>Đơn hàng mới nhất</strong>
-                <button onClick={() => handleSelectView("Orders")}>
-                  Quản lý tất cả đơn hàng <Icon name="arrow" />
-                </button>
-              </div>
-              <div className="admin-table-responsive">
-                <div className="admin-th" style={{ gridTemplateColumns: "1.1fr 1.5fr 1fr 1.2fr 1fr" }}>
-                  <span>Mã đơn</span>
-                  <span>Khách hàng</span>
-                  <span>Mặt hàng</span>
-                  <span>Giá trị</span>
-                  <span>Trạng thái</span>
-                </div>
-                {orders.slice(0, 4).map((ord) => (
-                  <div className="admin-tr" style={{ gridTemplateColumns: "1.1fr 1.5fr 1fr 1.2fr 1fr" }} key={ord.id}>
-                    <span><strong>{ord.id}</strong></span>
-                    <span>{ord.customerName}</span>
-                    <span>{ord.items.length} mặt hàng</span>
-                    <span><strong>{money(ord.total)}</strong></span>
-                    <span>
-                      <span className={`admin-badge ${ord.status === "Đã giao" ? "badge-success" : ord.status === "Đang giao" ? "badge-info" : "badge-warning"}`}>
-                        {ord.status}
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {view === "Dashboard" && <AdminOverview />}
 
         {/* ========================================================
             2. PRODUCTS VIEW (/admin/products)
@@ -764,53 +668,7 @@ export function AdminPortal({
         {/* ========================================================
             5. CUSTOMERS VIEW (/admin/customers)
             ======================================================== */}
-        {view === "Customers" && (
-          <div className="admin-table">
-            <div className="admin-table-title">
-              <strong>Danh sách khách hàng</strong>
-              <span>{customers.length} thành viên</span>
-            </div>
-            <div className="admin-table-responsive">
-              <div className="admin-th" style={{ gridTemplateColumns: "1.2fr 1.4fr 1fr 1fr 1.2fr 100px 120px" }}>
-                <span>Họ tên</span>
-                <span>Email</span>
-                <span>Điện thoại</span>
-                <span>Số đơn hàng</span>
-                <span>Tổng chi tiêu</span>
-                <span>Trạng thái</span>
-                <span>Thao tác</span>
-              </div>
-              {customers.map((c) => (
-                <div className="admin-tr" style={{ gridTemplateColumns: "1.2fr 1.4fr 1fr 1fr 1.2fr 100px 120px", alignItems: "center" }} key={c.id}>
-                  <span><strong>{c.name}</strong></span>
-                  <span>{c.email}</span>
-                  <span>{c.phone}</span>
-                  <span>{c.ordersCount} đơn</span>
-                  <span><strong>{money(c.totalSpent)}</strong></span>
-                  <span>
-                    <span className={`admin-badge ${c.status === "Hoạt động" ? "badge-success" : "badge-danger"}`}>
-                      {c.status}
-                    </span>
-                  </span>
-                  <span style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      className="admin-action-btn"
-                      onClick={() => setShowCustomerModal(c)}
-                    >
-                      Chi tiết
-                    </button>
-                    <button
-                      className="admin-action-btn"
-                      onClick={() => onUpdateCustomerStatus && onUpdateCustomerStatus(c.id, c.status === "Hoạt động" ? "Tạm khóa" : "Hoạt động")}
-                    >
-                      Đổi trạng thái
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {view === "Customers" && <AdminCustomers />}
 
         {/* ========================================================
             6. REVIEWS VIEW (/admin/reviews)
@@ -965,78 +823,7 @@ export function AdminPortal({
         {/* ========================================================
             9. STATISTICS VIEW (/admin/statistics)
             ======================================================== */}
-        {view === "Statistics" && (
-          <div className="admin-view-content">
-            <div className="kpis" style={{ marginBottom: "25px" }}>
-              <div>
-                <span>Doanh thu luỹ kế</span>
-                <strong>1.284.500.000₫</strong>
-                <small>Niên vụ 2024 - 2026</small>
-              </div>
-              <div>
-                <span>Tổng đơn hoàn tất</span>
-                <strong>1.842 đơn</strong>
-                <small>Tỷ lệ giao đúng hẹn 98.4%</small>
-              </div>
-              <div>
-                <span>Khách hàng thành viên</span>
-                <strong>3.250 người</strong>
-                <small>42% khách hàng quay lại</small>
-              </div>
-              <div>
-                <span>Sản lượng tiêu thụ</span>
-                <strong>4.850 kg chè</strong>
-                <small>Chè khô đóng gói hút chân không</small>
-              </div>
-            </div>
-
-            {/* Region Revenue Distribution */}
-            <div className="chart-card" style={{ marginBottom: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
-                <strong>Cơ cấu doanh thu theo từng vùng chè Thái Nguyên</strong>
-                <span>Tân Cương chiếm ưu thế áp đảo</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "15px" }}>
-                {[
-                  { region: "Vùng Tân Cương", percent: "58%", val: "745.0 triệu", color: "var(--forest)" },
-                  { region: "Vùng Trại Cài", percent: "18%", val: "231.2 triệu", color: "var(--brown)" },
-                  { region: "Vùng La Bằng", percent: "14%", val: "179.8 triệu", color: "var(--leaf)" },
-                  { region: "Vùng Khe Cốc", percent: "10%", val: "128.5 triệu", color: "var(--gold)" }
-                ].map((item) => (
-                  <div key={item.region} style={{ background: "var(--paper)", border: "1px solid var(--line)", padding: "16px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: item.color }}>{item.region}</div>
-                    <div style={{ font: "500 24px 'Lora', serif", margin: "8px 0" }}>{item.percent}</div>
-                    <small style={{ color: "var(--muted)" }}>{item.val}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Monthly Trend Chart */}
-            <div className="chart-card">
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
-                <strong>Biểu đồ sản lượng tiêu thụ 6 tháng gần nhất</strong>
-                <span>Khối lượng tính theo Kg</span>
-              </div>
-              <div className="chart">
-                <div className="chart-line" />
-                <div className="chart-grid">
-                  {[1, 2, 3, 4].map((x) => (
-                    <i key={x} />
-                  ))}
-                </div>
-                <div className="chart-labels">
-                  <span>Tháng 10 (620kg)</span>
-                  <span>Tháng 11 (780kg)</span>
-                  <span>Tháng 12 (940kg)</span>
-                  <span>Tháng 1 (1.120kg)</span>
-                  <span>Tháng 2 (850kg)</span>
-                  <span>Tháng 3 (980kg)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {view === "Statistics" && <AdminOverview />}
       </section>
 
       {/* ========================================================
