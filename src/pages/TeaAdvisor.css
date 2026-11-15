@@ -12,3 +12,18 @@
 .tea-recommendations.compact h2 { font-size: 1rem; }
 .tea-recommendations.compact .tea-reason { font-size: .75rem; }
 .tea-recommendation-list { display: grid; gap: .5rem; }
+
+/* Override legacy icon-only composer sizing for the advisor's text actions. */
+.tea-advisor .ai-compose > button { width:auto; min-width:130px; padding:0 18px; display:inline-flex; font-size:14px; white-space:nowrap; }
+.tea-advisor .ai-compose > small,.tea-advisor .ai-help { font-size:12px; line-height:1.6; }
+.tea-advisor .ai-product span,.tea-advisor .ai-product .btn,.tea-advisor .tea-reply small { font-size:13px; }
+.tea-advisor .ai-product:has(>div:only-child) { grid-template-columns:1fr; }
+.tea-advisor .ai-product > div { min-width:0; overflow-wrap:anywhere; }
+.tea-advisor .tea-preferences > label { display:grid;gap:6px;max-width:420px; }
+.tea-advisor .tea-preferences > label select { padding:8px;border:1px solid #bccfc3;border-radius:8px;background:white; }
+@media(max-width:700px) {
+ .tea-advisor.ai-page { height:auto; }
+ .tea-advisor .ai-product { grid-template-columns:90px minmax(0,1fr); }
+ .tea-advisor .ai-product img { width:90px; height:120px; }
+ .tea-advisor .ai-side { display:flex; }
+}

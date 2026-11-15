@@ -15,6 +15,7 @@ import CustomerOrders from "./components/CustomerOrders";
 import "./pages/ManualFeedback.css";
 import ChatbotWidget from "./components/ChatbotWidget";
 import LeafAnalysis from "./pages/LeafAnalysis";
+import TeaAdvisor from "./pages/TeaAdvisor";
 import TeaRecommendations from "./components/TeaRecommendations";
 import TasteFinder from "./components/TasteFinder";
 import PaymentCheckout from "./pages/PaymentCheckout";
@@ -1313,6 +1314,12 @@ export default function App() {
     navigate("product");
   };
 
+  // Chat answers can contain a newly available product absent from the initial catalog snapshot.
+  const handleSelectChatProduct = (product: Product) => {
+    setProducts(current => [...current.filter(p => p.id !== product.id), product]);
+    handleSelectProduct(product);
+  };
+
   const handleSelectRegion = (regionId: string) => {
     setSelectedRegionId(regionId);
     navigate("tea-region-detail");
@@ -1441,7 +1448,7 @@ export default function App() {
         {page === "home" && (
           <Home
             products={products}
-            navigate={p => p === "ai" ? setChatOpenSignal(n => n + 1) : navigate(p)}
+            navigate={navigate}
             onSelectProduct={handleSelectProduct}
             onAddToCart={addToCart}
             onBuyNow={handleBuyNow}
@@ -1495,7 +1502,8 @@ export default function App() {
         <PaymentCheckout selectedItems={directPurchase||buyAgain?.owner===String(currentUser?.id)?undefined:selectedDraft?.items} buyNow={directPurchase ? { productId: directPurchase.product.id, quantity: directPurchase.qty, intentId: directPurchase.intentId ?? "legacy" } : undefined} buyAgain={buyAgain?.owner===String(currentUser?.id)?buyAgain.items:undefined} openOrder={openOrder} openOrders={openOrders} key={String(currentUser?.id)} products={products} cart={buyAgain?.owner===String(currentUser?.id)?buyAgain.items.map(item=>({product:item.product,qty:item.quantity})):directPurchase ? [directPurchase] : (selectedDraft?cart.filter(x=>selectedDraft.items.some(i=>x.cartItemId===i.cartItemId)):cart).map(x=>({...x,product:{...x.product,weight:products.find(p=>p.id===x.product.id)?.weight??x.product.weight}}))} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
       )}
 
-      {(page === "ai" || page === "leaf") && <LeafAnalysis />}
+      {page === "ai" && <TeaAdvisor key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} navigate={navigate} onAddToCart={addToCart} onSelectProduct={handleSelectChatProduct} />}
+      {page === "leaf" && <LeafAnalysis />}
 
       {page === "seller" && (authState === "loading" ? <main className="page"><p role="status">Đang xác minh phiên đăng nhập…</p></main> : authState === "error" ? <main className="page"><p role="alert">Không thể xác minh phiên đăng nhập.</p><button className="btn btn-outline" onClick={() => setAuthRetry(n => n + 1)}>Thử lại</button></main> : <SellerCenter key={String(currentUser?.id ?? "guest")} user={authState === "guest" ? null : currentUser} onLogin={() => { sessionStorage.setItem("teasmart_seller_return", "/seller"); navigate("login"); }} onShopping={() => navigate("home")} />)}
       {page === "account" && (
@@ -1516,9 +1524,9 @@ export default function App() {
       {page === "policy" && <PolicyPage />}
       </div>
 
-      <ChatbotWidget key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} onLogin={() => navigate("login")} onProduct={handleSelectProduct} openSignal={chatOpenSignal} />
+      <ChatbotWidget key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} onLogin={() => navigate("login")} onProduct={handleSelectChatProduct} openSignal={chatOpenSignal} />
       {!["checkout", "admin"].includes(page) && (
-        <Footer navigate={p => p === "ai" ? setChatOpenSignal(n => n + 1) : navigate(p)} />
+        <Footer navigate={navigate} />
       )}
     </div>
   );

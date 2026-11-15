@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { money } from "../components/ProductCard";
-import { api, ApiError, mapProduct } from "../lib/commerce";
-import { validateTeaForm, requestTeaAdvice, type TeaAdvice, type TeaPreferences } from "../lib/teaAdvisor";
-import { requestRagAdvice, currentBusinessProduct, type RagAdvice } from "../lib/ragChat";
+import { api, mapProduct } from "../lib/commerce";
+import { validateTeaForm, type TeaPreferences } from "../lib/teaAdvisor";
+import { requestRagAdvice, chatErrorMessage, currentBusinessProduct, type RagAdvice } from "../lib/ragChat";
 import type { Page, Product } from "../types";
 import "./TeaAdvisor.css";
 type Option = { categoryId?: number; regionId?: number; name: string };
 type Exchange = { message: string; answer: RagAdvice };
 export default function TeaAdvisor({ navigate, onAddToCart, onSelectProduct, customer }: {
   navigate: (p: Page) => void; onAddToCart: (p: Product) => void; onSelectProduct: (p: Product) => void; customer: boolean }) {
-  const [mode, setMode] = useState<"rag" | "catalog">("rag");
+  const [mode, setMode] = useState<"rag" | "catalog">("catalog");
   const [message, setMessage] = useState(""); const [min, setMin] = useState(""); const [max, setMax] = useState("");
   const [category, setCategory] = useState(""); const [region, setRegion] = useState(""); const [purpose, setPurpose] = useState("");
   const [strength, setStrength] = useState(""); const [astringency, setAstringency] = useState("");
   const [categories, setCategories] = useState<Option[]>([]); const [regions, setRegions] = useState<Option[]>([]);
   const [optionsError, setOptionsError] = useState(false); const [optionRetry, setOptionRetry] = useState(0);
+  const [lastQuestion, setLastQuestion] = useState("");
   const [history, setHistory] = useState<Exchange[]>([]); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   const request = useRef<AbortController | null>(null); const inFlight = useRef(false); const context = useRef<TeaPreferences | undefined>(undefined);
   useEffect(() => {
@@ -34,14 +35,24 @@ export default function TeaAdvisor({ navigate, onAddToCart, onSelectProduct, cus
     const preferences: TeaPreferences = { ...(category && { categoryId: Number(category) }), ...(region && { regionId: Number(region) }),
       ...(min && { minPrice: Number(min) }), ...(max && { maxPrice: Number(max) }), ...(strength && { strength: Number(strength) }),
       ...(astringency && { astringency: Number(astringency) }), ...(purpose && { purpose: purpose as "DAILY" | "GIFT" }) };
-    const abort = new AbortController(); request.current = abort; inFlight.current = true; setBusy(true); setError("");
+    const abort = new AbortController(); request.current = abort; inFlight.current = true; setBusy(true); setError(""); setLastQuestion(text);
     try {
-      const answer = mode === "rag" ? await requestRagAdvice(text, preferences, context.current, history.map(x => x.message), abort.signal) : await requestTeaAdvice(text, preferences, context.current, abort.signal);
+      const answer = await requestRagAdvice(text, preferences, context.current, history.map(x => x.message), abort.signal, mode === "rag");
       if (!abort.signal.aborted) { setHistory(h => [...h, { message: text.trim(), answer }].slice(-8)); context.current = answer.preferences; setMessage(""); }
-    } catch (e) { if (!abort.signal.aborted) setError(e instanceof ApiError ? (e.status === 401 ? "Phiên đăng nhập không còn hợp lệ. Hãy đăng nhập lại." : e.status === 403 ? "Chức năng tư vấn dành cho tài khoản khách hàng." : e.message) : "Kết nối bị gián đoạn. Bạn có thể thử gửi lại."); }
+    } catch (e) { if (!abort.signal.aborted) setError(chatErrorMessage(e)); }
     finally { if (!abort.signal.aborted) { inFlight.current = false; setBusy(false); } }
   }
   const latest = history.at(-1)?.answer;
+  const [images, setImages] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const abort = new AbortController(); setImages({});
+    for (const item of latest?.businessProducts ?? []) {
+      void currentBusinessProduct(item.slug, abort.signal).then(p => {
+        if (!abort.signal.aborted && p.imageUrl) setImages(old => ({ ...old, [item.slug]: p.imageUrl! }));
+      }).catch(() => { /* Product details remain retryable; never invent an image. */ });
+    }
+    return () => abort.abort();
+  }, [latest]);
   return <main className="page ai-page tea-advisor"><aside className="ai-side"><div><span><Icon name="spark" /></span><strong>TeaSmart AI</strong><small>Trợ lý chọn chè từ danh mục thật</small></div>
     <button onClick={reset}>Cuộc trò chuyện mới</button><button onClick={() => navigate("leaf")}><Icon name="camera" /> Phân tích lá chè</button>
     <p className="ai-help">Chế độ RAG dùng tài liệu có nguồn và LLM khi đã cấu hình. Giá, tồn kho và thống kê lấy trực tiếp từ Backend. Chế độ danh mục nhanh dùng quy tắc. Không dùng LLM ở chế độ này. Không cam kết công dụng sức khỏe. Không gửi mật khẩu, token hoặc thông tin cá nhân.</p></aside>
@@ -59,14 +70,14 @@ export default function TeaAdvisor({ navigate, onAddToCart, onSelectProduct, cus
         </div>
         <div className="messages" aria-live="polite"><p>Hãy mô tả khẩu vị và ngân sách, ví dụ: “Ít chát, hậu ngọt, tối đa 300k”.</p>
           <div className="ai-quick">{["Đậm vị", "Ít chát", "Hậu ngọt", "Uống hằng ngày", "Mua làm quà"].map(t => <button disabled={busy} key={t} onClick={() => void send(t)}>{t}</button>)}</div>
-          {history.map((x, i) => <div key={i}><div className="bubble-row user-row"><p className="bubble user">{x.message}</p></div><div className="bubble-row"><div className="bubble ai tea-reply"><p>{x.answer.reply}</p>{x.answer.sources?.length ? <ul aria-label="Nguồn tham khảo">{x.answer.sources.map(source => <li key={source.id}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a><small> — {source.publisher}; truy cập {source.accessedAt}</small></li>)}</ul> : null}{x.answer.businessProducts?.length ? <p>Dữ liệu kinh doanh tại thời điểm truy vấn, không phải dự đoán của LLM.</p> : null}</div></div></div>)}
-          {busy && <p role="status">Đang tra cứu dữ liệu và tài liệu phù hợp…</p>}{error && <div role="alert"><p>{error}</p><button onClick={() => navigate("login")}>Đăng nhập lại</button></div>}
+          {history.map((x, i) => <div key={i}><div className="bubble-row user-row"><p className="bubble user">{x.message}</p></div><div className="bubble-row"><div className="bubble ai tea-reply"><small>{x.answer.llmUsed ? "Kiến thức RAG + LLM" : x.answer.businessKind === "KNOWLEDGE" ? "Tra cứu tài liệu · Chưa có câu trả lời LLM" : "Tra cứu danh mục theo quy tắc · Không dùng LLM"}</small><p>{x.answer.reply}</p>{x.answer.sources?.length ? <ul aria-label="Nguồn tham khảo">{x.answer.sources.map(source => <li key={source.id}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a><small> — {source.publisher}; truy cập {source.accessedAt}</small></li>)}</ul> : null}{x.answer.businessProducts?.length ? <p>Dữ liệu kinh doanh tại thời điểm truy vấn, không phải dự đoán của LLM.</p> : null}</div></div></div>)}
+          {busy && <p role="status">Đang tra cứu dữ liệu và tài liệu phù hợp…</p>}{error && <div role="alert"><p>{error}</p><button disabled={busy} onClick={() => void send(lastQuestion)}>Thử lại</button> <button onClick={() => navigate("login")}>Đăng nhập</button></div>}
           {latest && <>{latest.notices.map(n => <p className="tea-reason" key={n}>{n}</p>)}
-            {latest.businessProducts?.map(item => <article className="ai-product" key={item.productId}><div><strong>{item.name}</strong><b>{money(item.price)}</b><span>Còn {item.stockQuantity} gói tại thời điểm truy vấn</span>{item.unitsSold != null && <span>Đã bán hợp lệ: {item.unitsSold} gói</span>}{item.averageRating != null && <span>Điểm APPROVED: {Number(item.averageRating).toFixed(2)}/5 ({item.reviewCount} đánh giá)</span>}<button className="btn btn-outline" disabled={busy} onClick={async () => { if (inFlight.current) return; const abort = new AbortController(); request.current = abort; inFlight.current = true; setBusy(true); try { const product = await currentBusinessProduct(item.slug, abort.signal); if (!abort.signal.aborted) onSelectProduct(mapProduct(product)); } catch { if (!abort.signal.aborted) setError("Không tải được sản phẩm hiện tại. Hãy thử lại."); } finally { if (!abort.signal.aborted) { inFlight.current = false; setBusy(false); } } }}>Xem sản phẩm</button></div></article>)}
-            {!latest.businessKind && !latest.recommendations.items.length && <p>Không có sản phẩm phù hợp các điều kiện hiện tại.</p>}
+            {latest.businessProducts?.map(item => <article className="ai-product" key={item.productId}>{images[item.slug] && <img src={images[item.slug]} alt={item.name} loading="lazy" />}<div><strong>{item.name}</strong><b>{money(item.price)}</b><span>Còn {item.stockQuantity} gói tại thời điểm truy vấn</span>{item.unitsSold != null && <span>Đã bán hợp lệ: {item.unitsSold} gói</span>}{item.averageRating != null && <span>Điểm APPROVED: {Number(item.averageRating).toFixed(2)}/5 ({item.reviewCount} đánh giá)</span>}<button className="btn btn-outline" disabled={busy} onClick={async () => { if (inFlight.current) return; const abort = new AbortController(); request.current = abort; inFlight.current = true; setBusy(true); try { const product = await currentBusinessProduct(item.slug, abort.signal); if (!abort.signal.aborted) onSelectProduct(mapProduct(product)); } catch { if (!abort.signal.aborted) setError("Không tải được sản phẩm hiện tại. Hãy thử lại."); } finally { if (!abort.signal.aborted) { inFlight.current = false; setBusy(false); } } }}>Xem chi tiết sản phẩm</button></div></article>)}
+            {(latest.businessKind === "PRODUCTS" && !latest.businessProducts?.length || !latest.businessKind && !latest.recommendations.items.length) && <p>Không có sản phẩm phù hợp các điều kiện hiện tại.</p>}
             {(!latest.businessKind ? latest.recommendations.items : []).map(item => { const p = mapProduct(item.product); return <article className="ai-product" key={p.id}>
               {p.image && <img src={p.image} alt={p.name} loading="lazy" />}<div><strong>{p.name}</strong><span>{p.note}</span><b>{money(p.price)} / {p.weight}</b><span>Còn {item.stockQuantity} gói lúc tư vấn</span>
-                <p>{item.reasons.join(" · ")}</p><div><button className="btn btn-outline" onClick={() => onSelectProduct(p)}>Xem sản phẩm</button><button className="btn btn-primary" onClick={() => onAddToCart(p)}>Thêm vào giỏ</button></div></div>
+                <p>{item.reasons.join(" · ")}</p><div><button className="btn btn-outline" onClick={() => onSelectProduct(p)}>Xem chi tiết sản phẩm</button><button className="btn btn-primary" onClick={() => onAddToCart(p)}>Thêm vào giỏ</button></div></div>
             </article>; })}</>}
         </div>
         <form className="ai-compose" onSubmit={e => { e.preventDefault(); void send(); }}><label htmlFor="tea-message">Nhu cầu của bạn</label><textarea id="tea-message" maxLength={1000} value={message} disabled={busy} onChange={e => setMessage(e.target.value)} placeholder="Ví dụ: ít chát, hậu ngọt, dưới 300k" />
