@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { api, ApiError, mapCart, mapOrder, readPendingCheckout, sandboxRedirect, errorMessage } from "../src/lib/commerce.ts";
+import { checkoutAfterVerifiedCancellation, paymentReturnDestination } from "../src/lib/paymentReturn.ts";
 
 const storage = new Map<string, string>();
 Object.defineProperty(globalThis, "sessionStorage", { value: {
@@ -8,6 +9,24 @@ Object.defineProperty(globalThis, "sessionStorage", { value: {
   setItem: (k: string, v: string) => storage.set(k, v),
   removeItem: (k: string) => storage.delete(k),
 } });
+
+test("VNPay return routes unresolved/cancelled sessions back to Checkout, but keeps paid orders on result", () => {
+  assert.equal(paymentReturnDestination({ orderId: null, attemptStatus: "UNKNOWN", sessionStatus: "VERIFYING", reconciliationRequired: true }), "checkout");
+  assert.equal(paymentReturnDestination({ orderId: null, attemptStatus: "PENDING", sessionStatus: "AWAITING_PAYMENT", reconciliationRequired: false }), "checkout");
+  assert.equal(paymentReturnDestination({ orderId: null, attemptStatus: "FAILED_FINAL", sessionStatus: "READY", reconciliationRequired: false }), "checkout");
+  assert.equal(paymentReturnDestination({ orderId: 42, attemptStatus: "SUCCEEDED", sessionStatus: "COMPLETED", reconciliationRequired: false }), "result");
+});
+test("only a verified cancellation resets the matching checkout to a fresh, non-submitting session", () => {
+  const saved = { userId: "7", intentKey: "intent", sessionId: 12, key: "old-key", method: "VNPAY",
+    attemptKey: "old-attempt", attemptReference: "TS123", requestBody: { sourceType: "BUY_NOW", shipping: { shippingAddress: "Tea Street" } } };
+  assert.equal(checkoutAfterVerifiedCancellation(saved, "TS-other", 12, "fresh-key"), null);
+  assert.equal(checkoutAfterVerifiedCancellation(saved, "TS123", 13, "fresh-key"), null);
+  assert.equal(checkoutAfterVerifiedCancellation({ ...saved, requestBody: undefined }, "TS123", 12, "fresh-key"), null);
+  assert.deepEqual(checkoutAfterVerifiedCancellation(saved, "TS123", 12, "fresh-key"), {
+    userId: "7", intentKey: "intent", sessionId: null, key: "fresh-key", method: "COD", verifiedCancellationDraft: true,
+    requestBody: { sourceType: "BUY_NOW", shipping: { shippingAddress: "Tea Street" } },
+  });
+});
 test("API sends Bearer and idempotency key, uses same-origin API", async () => {
   storage.set("teasmart_access_token", "offline-test-token");
   globalThis.fetch = async (url, init) => {

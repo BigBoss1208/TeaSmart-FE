@@ -1,0 +1,20 @@
+/* Scope the responsive grid to Checkout; leave cart and payment behavior intact. */
+.checkout-experience form.checkout-grid.checkout-single-page {
+  grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+  grid-template-areas: "address summary" "payment summary";
+}
+.checkout-experience form.checkout-single-page > .form-section {
+  grid-area: payment;
+  min-width: 0;
+}
+@media (max-width: 1023px) {
+  .checkout-experience form.checkout-grid.checkout-single-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "address" "summary" "payment";
+  }
+}
+@media (max-width: 767px) {
+  .checkout-experience form.checkout-grid.checkout-single-page {
+    grid-template-areas: "address" "summary" "payment" "mobile-confirm";
+  }
+}

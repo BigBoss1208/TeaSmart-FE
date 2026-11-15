@@ -5,9 +5,12 @@ export type Page =
   | "cart"
   | "checkout"
   | "payment-return"
+  | "payment-incomplete"
+  | "order-detail"
   | "ai"
   | "leaf"
   | "account"
+  | "seller"
   | "admin"
   | "tea-regions"
   | "tea-region-detail"
@@ -15,15 +18,20 @@ export type Page =
   | "shop-detail"
   | "about"
   | "policy"
+  | "forgot-password"
+  | "reset-password"
   | "login"
   | "register";
 
 export interface User {
+  avatarUrl?: string;
   id: string | number;
   name: string;
   email: string;
   phone?: string;
   role: "USER" | "ADMIN";
+  sellerEnabled?: boolean;
+  authorities?: string[];
   joinDate?: string;
 }
 
@@ -36,9 +44,11 @@ export type AdminSubView =
   | "Reviews"
   | "TeaRegions"
   | "Shops"
-  | "Statistics";
+  | "Statistics"
+ ;
 
 export interface Product {
+  stockQuantity?: number;
   slug?: string;
   id: number;
   name: string;

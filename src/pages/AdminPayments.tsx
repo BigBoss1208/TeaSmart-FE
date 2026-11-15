@@ -1,6 +1,23 @@
 import { useEffect, useState } from "react";
-import { api, errorMessage, type ApiOrder, type ApiPage, type PaymentStatus } from "../lib/commerce";
+import { api, errorMessage, type ApiOrder, type ApiPage, type PaymentStatus, type CheckoutSession } from "../lib/commerce";
 import { money } from "../components/ProductCard";
+
+import { queryOutcomeDescription } from "../lib/paymentReconciliation";
+
+export function CheckoutSessionReconciliationQueue() {
+  const [sessions, setSessions] = useState<CheckoutSession[]>([]);
+  const [error, setError] = useState(""); const [busy, setBusy] = useState<number | null>(null); const [revision, setRevision] = useState(0);
+  const [reconcileResult, setReconcileResult] = useState<{outcome:string;paymentAttemptId:number|null;attemptStatus:string|null;queryOutcome:string;requestSent:boolean;httpStatus:number|null;elapsedMs:number;gatewayResponseCode:string|null;gatewayTransactionStatus:string|null}|null>(null);
+  useEffect(() => { let live = true; void api<CheckoutSession[]>("/admin/checkout-sessions/reconciliation").then(rows => { if (live) { setSessions(rows); setError(""); } }).catch(e => { if (live) setError(errorMessage(e)); }); return () => { live = false; }; }, [revision]);
+  async function reconcile(id: number) { if (busy !== null) return; setBusy(id); setError(""); setReconcileResult(null); try { const result=await api<typeof reconcileResult>(`/admin/checkout-sessions/${id}/reconcile`, { method: "POST" }); if(result)setReconcileResult(result); setRevision(x => x + 1); } catch (e) { setError(errorMessage(e)); } finally { setBusy(null); } }
+  return <section className="admin-table" aria-label="Đối soát Checkout Session"><div className="admin-table-title"><strong>Checkout Session cần đối soát</strong><button className="admin-action-btn" disabled={busy !== null} onClick={() => setRevision(x => x + 1)}>Làm mới</button></div>
+    {error && <p role="alert">{error}</p>}{reconcileResult&&<section role="status" className="admin-reconciliation-result"><strong>Kết quả đối soát: {reconcileResult.outcome}</strong><p>PaymentAttempt #{reconcileResult.paymentAttemptId??"—"}: {reconcileResult.attemptStatus??"không có"}</p><p>QueryDR: {reconcileResult.queryOutcome} · Đã gửi: {reconcileResult.requestSent?"Có":"Không"}{reconcileResult.httpStatus!==null?` · HTTP ${reconcileResult.httpStatus}`:""} · {reconcileResult.elapsedMs} ms</p><p>VNPay ResponseCode: {reconcileResult.gatewayResponseCode??"chưa xác minh"} · TransactionStatus: {reconcileResult.gatewayTransactionStatus??"chưa xác minh"}</p><p>{queryOutcomeDescription(reconcileResult.queryOutcome)}</p><small>HTTP 200 chỉ xác nhận có phản hồi HTTP; không tự hoàn tất Order hoặc xác nhận đã thanh toán.</small></section>}{sessions.map(s => <div className="admin-tr" key={s.checkoutSessionId} style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+      <strong>{s.sessionCode}</strong><span>{s.status} · {s.latestAttemptStatus ?? "chưa có attempt"}</span><span>{money(s.totalAmount)}</span>
+      {s.reconciliationRequired && <b>Cần xử lý thủ công trước khi giao hàng</b>}
+      <button className="admin-action-btn" disabled={busy !== null} onClick={() => void reconcile(s.checkoutSessionId)}>{busy === s.checkoutSessionId ? "Đang đối soát…" : "Kiểm tra trạng thái thanh toán"}</button>
+    </div>)}{!sessions.length && !error && <p>Không có Checkout Session cần đối soát.</p>}
+  </section>;
+}
 
 export default function AdminPayments() {
   const [page, setPage] = useState(0);

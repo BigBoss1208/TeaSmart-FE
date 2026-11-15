@@ -1637,6 +1637,7 @@ export default function App() {
   const [shops, setShops] = useState<TeaShop[]>(teaShopsData);
 
   // Authentication state
+  const [checkoutAuthLoading, setCheckoutAuthLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [registeredUsers, setRegisteredUsers] = useState<User[]>(() => {
     try {
@@ -1751,6 +1752,7 @@ export default function App() {
         try { const user = mapUser(await api<ApiUser>("/users/me")); if (live) setCurrentUser(user); }
         catch { sessionStorage.removeItem("teasmart_access_token"); }
       }
+      if (live) setCheckoutAuthLoading(false);
     })(); return () => { live = false; };
   }, []);
   useEffect(() => {
@@ -2038,10 +2040,10 @@ export default function App() {
         <Cart cart={cart} updateCart={updateCart} navigate={navigate} />
       )}
 
-      {page === "payment-return" && <PaymentReturn navigate={navigate} />}
+      {page === "payment-return" && <PaymentReturn navigate={navigate} products={products} authState={currentUser ? "ready" : checkoutAuthLoading ? "loading" : "guest"} onAuthRetry={() => window.location.reload()} openOrder={() => navigate("account")} openOrders={() => navigate("account")} />}
 
       {page === "checkout" && (
-        <PaymentCheckout key={String(currentUser?.id)} cart={cart} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
+        <PaymentCheckout products={products} key={String(currentUser?.id)} cart={cart} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
       )}
 
       {page === "ai" && (
