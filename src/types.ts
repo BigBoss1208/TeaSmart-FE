@@ -45,7 +45,7 @@ export type AdminSubView =
   | "TeaRegions"
   | "Shops"
   | "Statistics"
- ;
+  | "Sellers";
 
 export interface Product {
   stockQuantity?: number;

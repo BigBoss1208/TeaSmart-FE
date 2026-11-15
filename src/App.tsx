@@ -1,8 +1,28 @@
-import TeaAdvisor from "./pages/TeaAdvisor";
+import PublicPlaces from "./pages/PublicPlaces";
+import HomeArtwork, { type HomeArtworkKind } from "./components/HomeArtwork";
+import HeroVideo from "./components/HeroVideo";
+import {matchesProductSearch} from "./lib/productSearch";
+import {loadTasteCatalog, matchesTaste, type TasteProduct} from "./lib/tasteCatalog";
+import CartCatalog from "./components/CartCatalog";
+import SellerCenter from "./pages/SellerCenter";
+import {checkoutReceiptKey} from "./lib/checkoutReceipt";
+import "./pages/CustomerExperience.css";
+import MyReviews from "./components/MyReviews";
+import AccountSettings from "./components/AccountSettings";
+import SellerAccountLink from "./components/SellerAccountLink";
+import {isCustomerTasteProduct} from "./lib/tasteCatalog";
+import CustomerOrders from "./components/CustomerOrders";
+import "./pages/ManualFeedback.css";
+import ChatbotWidget from "./components/ChatbotWidget";
+import LeafAnalysis from "./pages/LeafAnalysis";
 import TeaRecommendations from "./components/TeaRecommendations";
+import TasteFinder from "./components/TasteFinder";
 import PaymentCheckout from "./pages/PaymentCheckout";
+import DemoProductDetail from "./pages/DemoProductDetail";
 import PaymentReturn from "./pages/PaymentReturn";
-import { api, errorMessage, mapUser, mapProduct, mapCart, mapOrder, type ApiUser, type ApiProduct, type ApiPage, type ApiCart, type ApiOrder, type CartLine } from "./lib/commerce";
+import PaymentIncomplete from "./pages/PaymentIncomplete";
+import CustomerOrderDetail from "./pages/CustomerOrderDetail";
+import { readPendingCheckout, ApiError, api, errorMessage, mapUser, mapProduct, mapCart, mapOrder, type ApiUser, type ApiProduct, type ApiPage, type ApiCart, type ApiOrder, type CartLine } from "./lib/commerce";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Product, Page, Order, Category, Customer, Review, TeaRegion, TeaShop, User, AdminSubView } from "./types";
 import {
@@ -23,6 +43,7 @@ import { TeaRegionsList, TeaRegionDetail } from "./pages/TeaRegions";
 import { TeaShopsList, TeaShopDetail } from "./pages/TeaShops";
 import { AdminPortal, getAdminViewFromPath, adminRoutes } from "./pages/Admin";
 import { LoginPage, RegisterPage } from "./pages/Auth";
+import PasswordRecovery from "./pages/PasswordRecovery";
 import { VideoCard } from "./components/VideoModal";
 import { ScrollReveal } from "./components/ScrollReveal";
 
@@ -94,139 +115,46 @@ function Home({
   navigate: (p: Page) => void;
   onSelectProduct: (p: Product) => void;
   onAddToCart: (p: Product) => void;
-  onBuyNow: (p: Product) => void;
+  onBuyNow: (p: Product, weight?: string, quantity?: number) => void;
   favorites: number[];
   onToggleFavorite: (id: number) => void;
   onSelectRegion: (id: string) => void;
   onSelectShop: (id: string) => void;
 }) {
-  const [taste, setTaste] = useState("Hậu ngọt");
-  const recommendationProfile: Record<string, string> = { "Đậm vị": "STRONG", "Ít chát": "LOW_ASTRINGENCY", "Hậu ngọt": "SWEET", "Hương thơm": "AROMATIC", "Uống hằng ngày": "DAILY", "Làm quà": "GIFT" };
-
-  const heroSlides = useMemo(() => [
-    {
-      kicker: "NGUYÊN BẢN TỪ ĐỆ NHẤT DANH TRÀ THÁI NGUYÊN",
-      title: "Tinh hoa chè Thái Nguyên\nChạm vị tự nhiên",
-      desc: "Khám phá những dòng chè đặc sản Thái Nguyên được tuyển chọn từ những vùng chè nổi tiếng.",
-      image: photos.hero,
-      cta1: { label: "Khám phá bộ sưu tập", action: () => navigate("explore") },
-      cta2: { label: "Tìm chè phù hợp", action: () => navigate("ai") }
-    },
-    {
-      kicker: "TỪ NHỮNG VÙNG CHÈ ĐẶC SẢN",
-      title: "Khám phá hương vị\ntừ vùng đất chè",
-      desc: "Tìm hiểu Tân Cương, Trại Cài, La Bằng và Khe Cốc – những vùng chè tạo nên bản sắc riêng của chè Thái Nguyên.",
-      image: photos.hills,
-      cta1: { label: "Khám phá vùng chè", action: () => navigate("tea-regions") },
-      cta2: { label: "Xem sản phẩm", action: () => navigate("explore") }
-    }
-  ], [navigate]);
-
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-
-  // Exact 2-second (2000ms) automatic slide transition with light fade
-  useEffect(() => {
-    if (isPaused) return;
-    const timer = setInterval(() => {
-      setActiveSlide((prev) => (prev === 0 ? 1 : 0));
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [isPaused]);
-
-  const prevSlide = () => {
-    setActiveSlide((prev) => (prev === 0 ? 1 : 0));
-  };
-
-  const nextSlide = () => {
-    setActiveSlide((prev) => (prev === 0 ? 1 : 0));
-  };
 
   const collections = [
-    { name: "Chè Tân Cương", copy: "Tinh tuyển từ vùng chè danh tiếng nhất xứ Thái Nguyên.", image: photos.hills },
-    { name: "Chè xanh", copy: "Vị chát thanh, hậu ngọt dịu cho mỗi sớm tinh mơ.", image: photos.cup },
-    { name: "Chè đặc sản", copy: "Những búp trà đinh, nõn tôm quý được sao thủ công.", image: photos.leaf },
-    { name: "Trà quà tặng", copy: "Trao tặng tinh hoa trà Việt trong thiết kế trang nhã.", image: photos.bowls }
+    { name: "Chè Tân Cương", copy: "Tinh tuyển từ vùng chè danh tiếng nhất xứ Thái Nguyên.", image: "hills" as HomeArtworkKind },
+    { name: "Chè xanh", copy: "Vị chát thanh, hậu ngọt dịu cho mỗi sớm tinh mơ.", image: "cup" as HomeArtworkKind },
+    { name: "Chè đặc sản", copy: "Những búp trà đinh, nõn tôm quý được sao thủ công.", image: "leaf" as HomeArtworkKind },
+    { name: "Trà quà tặng", copy: "Trao tặng tinh hoa trà Việt trong thiết kế trang nhã.", image: "gift" as HomeArtworkKind }
   ];
 
   return (
-    <main>
-      {/* 1. Hero Section — 2-Slide Luxury Slideshow (TWG-Inspired) */}
-      <section
-        className="hero"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        aria-label="Khám phá chè Thái Nguyên"
-      >
-        {heroSlides.map((slide, idx) => (
-          <div
-            key={idx}
-            className={`hero-slide-bg ${idx === activeSlide ? "active" : ""}`}
-            style={{ backgroundImage: `url(${slide.image})` }}
-          />
-        ))}
+    <main className="home-page">
+      {/* 1. Hero — supplied TeaSmart video with a static poster fallback. */}
+      <section className="hero" aria-label="Khám phá chè Thái Nguyên">
+        <HeroVideo />
         <div className="hero-overlay" />
 
-        <div className="hero-content" key={activeSlide}>
+        <div className="hero-content">
           <div className="hero-kicker">
             <span className="hero-kicker-line" />
-            <span className="hero-kicker-text">{heroSlides[activeSlide].kicker}</span>
+            <span className="hero-kicker-text">NGUYÊN BẢN TỪ ĐỆ NHẤT DANH TRÀ THÁI NGUYÊN</span>
           </div>
           <h1 className="hero-title">
-            {heroSlides[activeSlide].title}
+            {"Tinh hoa chè Thái Nguyên\nChạm vị tự nhiên"}
           </h1>
-          <p className="hero-desc">{heroSlides[activeSlide].desc}</p>
+          <p className="hero-desc">Khám phá những dòng chè đặc sản Thái Nguyên được tuyển chọn từ những vùng chè nổi tiếng.</p>
           <div className="hero-buttons">
-            <Button variant="light" onClick={heroSlides[activeSlide].cta1.action}>
-              {heroSlides[activeSlide].cta1.label} <Icon name="arrow" />
+            <Button variant="light" onClick={() => navigate("explore")}>
+              Khám phá bộ sưu tập <Icon name="arrow" />
             </Button>
-            {heroSlides[activeSlide].cta2 && (
-              <Button variant="outline" onClick={heroSlides[activeSlide].cta2.action}>
-                <Icon name="spark" /> {heroSlides[activeSlide].cta2.label}
-              </Button>
-            )}
+            <Button variant="outline" onClick={() => navigate("ai")}>
+              <Icon name="spark" /> Tìm chè phù hợp
+            </Button>
           </div>
         </div>
 
-        {/* Previous & Next Navigation Arrows */}
-        <div className="hero-nav-arrows">
-          <button
-            type="button"
-            className="hero-arrow-btn prev"
-            onClick={prevSlide}
-            aria-label="Slide trước"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="hero-arrow-btn next"
-            onClick={nextSlide}
-            aria-label="Slide kế tiếp"
-          >
-            ›
-          </button>
-        </div>
-
-        {/* Bottom Bar: Indicators 01 / 02 with Progress Bars */}
-        <div className="hero-bottom-bar">
-          <div className="hero-dots">
-            {heroSlides.map((_, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className={`hero-dot ${idx === activeSlide ? "active" : ""}`}
-                onClick={() => setActiveSlide(idx)}
-                aria-label={`Chuyển tới slide ${idx + 1}`}
-              >
-                <span className="hero-dot-bar" />
-              </button>
-            ))}
-            <span className="hero-slide-counter">
-              0{activeSlide + 1} / 02
-            </span>
-          </div>
-        </div>
       </section>
 
       {/* 2. TWG-Style Luxury Tea Discovery Strip */}
@@ -262,7 +190,7 @@ function Home({
           <div className="collection-grid">
             {collections.map((c, i) => (
               <article className={`collection-card c${i}`} key={c.name}>
-                <img src={c.image} alt={c.name} />
+                {i === 1 || i === 2 ? <img className="collection-real-photo" src={i === 1 ? "/assets/home/thai-nguyen-cup.jpg" : "/assets/home/thai-nguyen-dry-tea.jpg"} alt={i === 1 ? "Chén trà xanh Thái Nguyên — ảnh Phương Huy" : "Chè móc câu Thái Nguyên — ảnh Binh Giang"} loading="lazy" /> : <HomeArtwork kind={c.image} label={c.name} />}
                 <div className="collection-shade" />
                 <div className="collection-content">
                   <span>0{i + 1}</span>
@@ -280,37 +208,7 @@ function Home({
 
       {/* 4. Taste Finder */}
       <ScrollReveal direction="up" delay={80}>
-        <section className="taste-finder">
-          <div className="taste-copy">
-            <div className="eyebrow">Chọn theo khẩu vị</div>
-            <div className="taste-title">
-              Bạn thích vị chè<br />như thế nào?
-            </div>
-            <p>
-              Chọn một cảm nhận bạn yêu thích. TeaSmart sẽ gợi ý những dòng chè gần nhất với gu thưởng thức của bạn.
-            </p>
-            <Button onClick={() => navigate("ai")}>
-              <Icon name="spark" /> Để TeaSmart AI tư vấn
-            </Button>
-          </div>
-          <div className="taste-panel">
-            <div className="taste-options">
-              {["Đậm vị", "Ít chát", "Hậu ngọt", "Hương thơm", "Uống hằng ngày", "Làm quà"].map((t) => (
-                <button
-                  key={t}
-                  className={taste === t ? "selected" : ""}
-                  onClick={() => setTaste(t)}
-                >
-                  {t}
-                  {taste === t && <Icon name="check" size={17} />}
-                </button>
-              ))}
-            </div>
-            <div className="mini-recommend">
-              <TeaRecommendations profile={recommendationProfile[taste]} compact onSelectProduct={onSelectProduct} onAddToCart={onAddToCart} />
-            </div>
-          </div>
-        </section>
+        <TasteFinder onSelectProduct={onSelectProduct} onAi={() => navigate("ai")} />
       </ScrollReveal>
 
       {/* 5. Featured Products */}
@@ -332,7 +230,7 @@ function Home({
                 product={p}
                 onView={() => onSelectProduct(p)}
                 onAdd={() => onAddToCart(p)}
-                onBuyNow={() => onBuyNow(p)}
+                onBuyNow={(selected,w,q) => onBuyNow(selected??p,w,q)}
                 isFavorite={favorites.includes(p.id)}
                 onToggleFavorite={() => onToggleFavorite(p.id)}
               />
@@ -353,7 +251,7 @@ function Home({
             {teaRegionsData.map((reg) => (
               <article className="region-card" key={reg.id}>
                 <div className="region-card-img">
-                  <img src={reg.heroImage} alt={reg.name} />
+                  {reg.id === "tan-cuong" ? <HomeArtwork kind="hills" label={reg.name} /> : <img src={reg.heroImage} alt={reg.name} loading="lazy" />}
                   <span className="region-badge">{reg.district}</span>
                 </div>
                 <div className="region-card-body">
@@ -532,14 +430,14 @@ function Home({
           <SectionTitle eyebrow="Tea Journal" title="Chuyện trà & nghệ thuật thưởng thức" />
           <div className="journal-grid">
             {[
-              ["Cẩm nang", "Cách pha chè Thái Nguyên ngon đúng điệu", photos.cup],
-              ["Văn hóa", "Khám phá văn hóa chè Thái Nguyên trăm năm", photos.hills],
-              ["Bảo quản", "Giữ trọn hương cốm non qua từng mùa", photos.leaf]
+              ["Cẩm nang", "Cách pha chè Thái Nguyên ngon đúng điệu", "cup"],
+              ["Văn hóa", "Khám phá văn hóa chè Thái Nguyên trăm năm", "sunrise"],
+              ["Bảo quản", "Giữ trọn hương cốm non qua từng mùa", "leaf"]
             ].map((a, i) => (
               <article className={`journal-card j${i}`} key={a[1]}>
-                <img src={a[2]} alt={a[1]} />
+                <HomeArtwork kind={a[2] as HomeArtworkKind} label={a[1]} />
                 <div>
-                  <span>{a[0]} · 6 phút đọc</span>
+                  <span>{a[0]} – {i === 2 ? 4 : 6} phút đọc</span>
                   <div className="journal-title">{a[1]}</div>
                   <button onClick={() => navigate("explore")}>
                     Đọc bài viết <Icon name="arrow" size={18} />
@@ -568,30 +466,51 @@ function Explore({
   products: Product[];
   onSelectProduct: (p: Product) => void;
   onAddToCart: (p: Product) => void;
-  onBuyNow?: (p: Product) => void;
+  onBuyNow?: (p: Product, weight?: string, quantity?: number) => void;
   favorites: number[];
   onToggleFavorite: (id: number) => void;
 }) {
   const [filter, setFilter] = useState("Tất cả");
+  const [regionFilter, setRegionFilter] = useState("Tất cả");
   const [tasteFilter, setTasteFilter] = useState("Tất cả");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Phổ biến");
+  const [tasteCatalog, setTasteCatalog] = useState<TasteProduct[]>([]);
+  const [tasteCatalogLoading, setTasteCatalogLoading] = useState(true);
+  const [tasteCatalogError, setTasteCatalogError] = useState("");
+  const [tasteCatalogRetry, setTasteCatalogRetry] = useState(0);
+
+  useEffect(() => {
+    const abort = new AbortController();
+    setTasteCatalogLoading(true);
+    setTasteCatalogError("");
+    void loadTasteCatalog(abort.signal).then(rows => {
+      if (!abort.signal.aborted) setTasteCatalog(rows);
+    }).catch(() => {
+      if (!abort.signal.aborted) setTasteCatalogError("Không tải được điểm hương vị từ danh mục. Vui lòng thử lại.");
+    }).finally(() => {
+      if (!abort.signal.aborted) setTasteCatalogLoading(false);
+    });
+    return () => abort.abort();
+  }, [tasteCatalogRetry]);
 
   const visible = useMemo(() => {
+    const tasteById = new Map(tasteCatalog.map(item => [item.productId, item]));
     let result = products.filter(
       (p) =>
         (filter === "Tất cả" || p.type === filter) &&
-        (tasteFilter === "Tất cả" || p.taste.includes(tasteFilter)) &&
-        p.name.toLowerCase().includes(query.toLowerCase())
+        (tasteFilter === "Tất cả" || (() => { const facts=tasteById.get(p.id); return !!facts && matchesTaste(facts, tasteFilter as "Đậm vị" | "Ít chát" | "Hậu ngọt" | "Hương thơm"); })()) &&
+        (regionFilter === "Tất cả" || p.regionName === regionFilter) &&
+        matchesProductSearch(p, query)
     );
     if (sort === "Giá thấp → cao") result = [...result].sort((a, b) => a.price - b.price);
     if (sort === "Giá cao → thấp") result = [...result].sort((a, b) => b.price - a.price);
     return result;
-  }, [products, filter, tasteFilter, query, sort]);
+  }, [products, filter, tasteFilter, regionFilter, query, sort, tasteCatalog]);
 
   return (
     <main className="page">
-      <section className="explore-hero">
+      <section className="explore-hero explore-hero-approved">
         <div>
           <div className="eyebrow">Khám phá theo cách của bạn</div>
           <div className="page-title">
@@ -599,7 +518,7 @@ function Explore({
           </div>
           <p>Từ vị đậm truyền thống đến hương thanh nhẹ, mỗi tách trà là một hành trình riêng.</p>
         </div>
-        <img src={photos.hills} alt="Đồi chè" />
+        <div className="explore-artwork"><HomeArtwork kind="sunrise" label="Đồi chè xanh trong nắng sớm" /></div>
       </section>
 
       <section className="explore-content">
@@ -608,14 +527,16 @@ function Explore({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Tìm sản phẩm chè"
             placeholder="Tìm loại chè bạn yêu thích…"
           />
+          {query&&<button type="button" aria-label="Xóa từ khóa" onClick={()=>setQuery("")}><Icon name="close"/></button>}
         </div>
 
         <div className="explore-chips">
           <div>
             <span>Khám phá theo loại</span>
-            {["Tất cả", "Chè xanh", "Chè Tân Cương", "Chè đặc sản", "Quà tặng"].map((f) => (
+            {["Tất cả", ...new Set(products.map(p => p.type).filter(Boolean))].map((f) => (
               <button
                 key={f}
                 className={filter === f ? "active" : ""}
@@ -626,6 +547,7 @@ function Explore({
             ))}
           </div>
           <div>
+            <label>Vùng chè <select aria-label="Lọc vùng chè" value={regionFilter} onChange={e => setRegionFilter(e.target.value)}>{["Tất cả", ...new Set(products.map(p => p.regionName).filter((x): x is string => !!x))].map(name => <option key={name}>{name}</option>)}</select></label>
             <span>Khám phá theo vị</span>
             {["Tất cả", "Đậm vị", "Ít chát", "Hậu ngọt", "Hương thơm"].map((t) => (
               <button
@@ -641,8 +563,8 @@ function Explore({
 
         <div className="listing-head">
           <div>
-            <strong>{visible.length} sản phẩm chè</strong>
-            <span>Thu hái và đóng gói tại Thái Nguyên</span>
+            <strong>{tasteFilter !== "Tất cả" && tasteCatalogLoading ? "Đang kiểm tra sản phẩm…" : `Có ${visible.length} sản phẩm phù hợp`}</strong>
+            <span>Thông tin và quy cách theo danh mục hiện tại</span>
           </div>
           <div>
             <select value={sort} onChange={(e) => setSort(e.target.value)}>
@@ -654,11 +576,11 @@ function Explore({
         </div>
 
         <div className="listing" style={{ gridTemplateColumns: "1fr" }}>
-          {visible.length === 0 ? (
+          {tasteFilter !== "Tất cả" && tasteCatalogLoading ? <p role="status" style={{textAlign:"center",padding:"36px 0"}}>Đang tải điểm hương vị đã lưu cho sản phẩm…</p> : tasteFilter !== "Tất cả" && tasteCatalogError ? <div role="alert" style={{textAlign:"center",padding:"36px 0"}}><p>{tasteCatalogError}</p><button className="btn btn-outline" onClick={()=>setTasteCatalogRetry(n=>n+1)}>Thử lại</button></div> : visible.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>
               <Icon name="search" size={40} />
               <p style={{ marginTop: "12px" }}>Không tìm thấy sản phẩm chè nào phù hợp với bộ lọc.</p>
-              <button className="btn btn-primary" onClick={() => { setFilter("Tất cả"); setTasteFilter("Tất cả"); setQuery(""); }}>
+              <button className="btn btn-primary" onClick={() => { setFilter("Tất cả"); setTasteFilter("Tất cả"); setRegionFilter("Tất cả"); setQuery(""); }}>
                 Xem tất cả sản phẩm
               </button>
             </div>
@@ -670,7 +592,7 @@ function Explore({
                   product={p}
                   onView={() => onSelectProduct(p)}
                   onAdd={() => onAddToCart(p)}
-                  onBuyNow={onBuyNow ? () => onBuyNow(p) : undefined}
+                  onBuyNow={onBuyNow ? (selected,w,q) => onBuyNow(selected??p,w,q) : undefined}
                   isFavorite={favorites.includes(p.id)}
                   onToggleFavorite={() => onToggleFavorite(p.id)}
                 />
@@ -693,508 +615,39 @@ function ProductDetail({
   navigate,
   favorites,
   onToggleFavorite,
-  onSelectProduct
+  onSelectProduct,
+  customer = false
 }: {
   product: Product;
-  onAddToCart: (p: Product, weight?: string) => void;
-  onBuyNow?: (p: Product, weight?: string) => void;
+  customer?: boolean;
+  onAddToCart: (p: Product, weight?: string, quantity?: number) => void | Promise<unknown>;
+  onBuyNow?: (p: Product, weight?: string, quantity?: number) => void;
   navigate: (p: Page) => void;
   favorites: number[];
   onToggleFavorite: (id: number) => void;
   onSelectProduct: (p: Product) => void;
 }) {
-  const p = product;
-  const [weight, setWeight] = useState(p.weight || "200g");
-  const [activeTab, setActiveTab] = useState<"desc" | "brew" | "reviews">("desc");
-  const isFav = favorites.includes(p.id);
-
-  const add = () => onAddToCart({ ...p, weight }, weight);
-
-  return (
-    <main className="page product-page">
-      <div className="breadcrumbs">
-        <button onClick={() => navigate("home")} style={{ background: "none", border: 0, cursor: "pointer", padding: 0 }}>
-          Trang chủ
-        </button>{" "}
-        <span>/</span>{" "}
-        <button onClick={() => navigate("explore")} style={{ background: "none", border: 0, cursor: "pointer", padding: 0 }}>
-          {p.type}
-        </button>{" "}
-        <span>/</span> {p.name}
-      </div>
-
-      <section className="detail">
-        <div className="gallery">
-          <div className="thumbs">
-            {(p.gallery && p.gallery.length > 0 ? p.gallery : [p.image, photos.cup, photos.leaf]).filter(Boolean).map((im, i) => (
-              <button key={i} className={i === 0 ? "active" : ""}>
-                <img src={im} alt="" />
-              </button>
-            ))}
-          </div>
-          <div className="main-photo">
-            {p.image ? <img src={p.image} alt={p.name} /> : <p>Chưa có ảnh sản phẩm</p>}
-            <span>{p.regionName || "Đặc sản Thái Nguyên"}</span>
-          </div>
-        </div>
-
-        <div className="detail-info">
-          <div className="eyebrow">{p.type}</div>
-          <div className="detail-title">{p.name}</div>
-          <div className="detail-rating">
-            <span>★★★★★</span> {p.rating} · {p.reviewsCount || 126} đánh giá
-            <button
-              onClick={() => onToggleFavorite(p.id)}
-              style={{
-                marginLeft: "15px",
-                background: "none",
-                border: "1px solid var(--line)",
-                padding: "3px 8px",
-                fontSize: "10px",
-                cursor: "pointer",
-                color: isFav ? "var(--gold)" : "inherit"
-              }}
-            >
-              <Icon name="heart" size={13} /> {isFav ? "Đã lưu vào yêu thích" : "Lưu vào yêu thích"}
-            </button>
-          </div>
-          <div className="detail-price">{money(p.price)}</div>
-          <p className="detail-desc">{p.description || p.note}</p>
-
-          <div className="option-label">Chọn khối lượng</div>
-          <div className="weight-options">
-            {[product.weight].map((w) => (
-              <button
-                key={w}
-                className={weight === w ? "active" : ""}
-                onClick={() => setWeight(w)}
-              >
-                {w}
-                <small>
-                  {w === "100g" ? money(Math.round(p.price * 0.55)) : w === "200g" ? money(p.price) : money(Math.round(p.price * 2.3))}
-                </small>
-              </button>
-            ))}
-          </div>
-
-          <div className="tea-profile">
-            <div className="option-label">Hồ sơ hương vị chè</div>
-            {[
-              ["Hương vị", p.taste.join(" · ")],
-              ["Độ đậm", String(p.intensity || 4)],
-              ["Độ chát", String(p.astringency || 3)],
-              ["Hậu vị ngọt", String(p.sweetness || 5)],
-              ["Hương thơm", String(p.aroma || 4)]
-            ].map(([k, v], i) => (
-              <div key={k}>
-                <span>{k}</span>
-                {i === 0 ? (
-                  <strong>{v}</strong>
-                ) : (
-                  <div className="dots">
-                    {[1, 2, 3, 4, 5].map((d) => (
-                      <i key={d} className={d <= +v ? "fill" : ""} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="detail-actions">
-            <Button onClick={add}>
-              <Icon name="bag" /> Thêm vào giỏ
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                add();
-                navigate("checkout");
-              }}
-            >
-              Mua ngay
-            </Button>
-          </div>
-
-          <div className="benefits">
-            <span><Icon name="leaf" /> Chè vụ mới</span>
-            <span><Icon name="check" /> Nguồn gốc minh bạch</span>
-            <span><Icon name="bag" /> Đổi trả 7 ngày</span>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 10: Cam kết chất lượng & nguồn gốc */}
-      <section className="section quality-section" style={{ maxWidth: "1240px", margin: "0 auto", padding: "40px 34px" }}>
-        <div className="section-title" style={{ marginBottom: "20px" }}>
-          <div className="eyebrow">Minh bạch & Trách nhiệm</div>
-          <div className="title">Cam kết chất lượng & Nguồn gốc</div>
-          <p>TeaSmart đồng hành cùng các hợp tác xã Thái Nguyên cam kết nguồn gốc xuất xứ và an toàn thực phẩm trên từng hộp chè.</p>
-        </div>
-        <div className="quality-grid">
-          <div className="quality-card">
-            <div className="quality-card-icon"><Icon name="mapPin" size={18} /></div>
-            <strong>Vùng nguyên liệu</strong>
-            <p>{p.qualityCommitment?.origin || "Vùng chỉ dẫn địa lý Tân Cương, TP. Thái Nguyên, Việt Nam"}</p>
-            <small style={{ color: "var(--forest)", fontWeight: 600 }}>Độ cao: {p.qualityCommitment?.altitude || "220m"}</small>
-          </div>
-          <div className="quality-card">
-            <div className="quality-card-icon"><Icon name="leaf" size={18} /></div>
-            <strong>Quy chuẩn thu hái</strong>
-            <p>{p.qualityCommitment?.harvestMethod || "Thu hái thủ công 1 tôm 2 lá vào sáng sớm trước khi mặt trời gắt"}</p>
-            <small style={{ color: "var(--forest)", fontWeight: 600 }}>Nghệ nhân sao củi truyền thống</small>
-          </div>
-          <div className="quality-card">
-            <div className="quality-card-icon"><Icon name="award" size={18} /></div>
-            <strong>Chứng nhận & Tiêu chuẩn</strong>
-            <p>{p.qualityCommitment?.standard || "Tiêu chuẩn VietGAP & Chứng nhận OCOP 4 sao tỉnh Thái Nguyên"}</p>
-            <small style={{ color: "var(--forest)", fontWeight: 600 }}>{p.qualityCommitment?.safetyCertificate || "Chứng nhận ATTP Quốc gia"}</small>
-          </div>
-          <div className="quality-card">
-            <div className="quality-card-icon"><Icon name="shieldCheck" size={18} /></div>
-            <strong>Đóng gói & Bảo quản</strong>
-            <p>Túi thiếc tráng bạc hút chân không cao cấp, giữ trọn hương cốm tự nhiên.</p>
-            <small style={{ color: "var(--forest)", fontWeight: 600 }}>Hạn dùng: {p.qualityCommitment?.shelfLife || "24 tháng"}</small>
-          </div>
-        </div>
-      </section>
-
-      {/* Tabs */}
-      <section className="detail-tabs">
-        <div className="tab-nav">
-          <button
-            className={activeTab === "desc" ? "active" : ""}
-            onClick={() => setActiveTab("desc")}
-          >
-            Mô tả sản phẩm
-          </button>
-          <button
-            className={activeTab === "brew" ? "active" : ""}
-            onClick={() => setActiveTab("brew")}
-          >
-            Hướng dẫn pha chè
-          </button>
-          <button
-            className={activeTab === "reviews" ? "active" : ""}
-            onClick={() => setActiveTab("reviews")}
-          >
-            Đánh giá ({p.reviewsCount || 126})
-          </button>
-        </div>
-
-        <div className="tab-content">
-          {activeTab === "desc" && (
-            <>
-              <div>
-                <div className="tab-title">Một tách trà mang hương vị của đất</div>
-                <p>
-                  Chè được canh tác theo quy trình chăm sóc chọn lọc, hái một tôm hai lá vào sáng sớm và sao thủ công ngay trong ngày. Mỗi cánh trà xoăn đều, xanh đen tự nhiên, đượm vị chát dịu và hậu ngọt bền lâu.
-                </p>
-              </div>
-              <div className="brew-steps">
-                {[
-                  ["01", "Tráng ấm", "Làm nóng ấm và chén bằng nước sôi"],
-                  ["02", "5g chè", "Cho 150ml nước 80°C - 85°C"],
-                  ["03", "80°C", "Nước vừa đủ nóng, không làm cháy búp non"],
-                  ["04", "3 phút", "Chờ trà mở hương và thưởng thức"]
-                ].map((x) => (
-                  <div key={x[0]}>
-                    <strong>{x[0]}</strong>
-                    <span>
-                      <b>{x[1]}</b>
-                      <small>{x[2]}</small>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {activeTab === "brew" && (
-            <div style={{ gridColumn: "span 2" }}>
-              <div className="tab-title">Nghệ thuật thưởng trà Thái Nguyên</div>
-              <p style={{ maxWidth: "700px", margin: "10px 0 20px" }}>
-                Để có một ấm trà tròn vị, người xưa có câu: "Nhất nước, nhì trà, tam bôi, tứ ấm".
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
-                <div style={{ background: "var(--paper)", padding: "20px", border: "1px solid var(--line)" }}>
-                  <strong style={{ display: "block", marginBottom: "6px" }}>Nước pha trà</strong>
-                  <p style={{ margin: 0, fontSize: "11px" }}>Nên dùng nước lọc tinh khiết hoặc nước suối đầu nguồn. Đun sôi và để nguội xuống 80 - 85°C.</p>
-                </div>
-                <div style={{ background: "var(--paper)", padding: "20px", border: "1px solid var(--line)" }}>
-                  <strong style={{ display: "block", marginBottom: "6px" }}>Định lượng trà</strong>
-                  <p style={{ margin: 0, fontSize: "11px" }}>Dùng khoảng 5g đến 7g chè cho ấm 150ml - 200ml phục vụ 3 - 4 người thưởng ẩm.</p>
-                </div>
-                <div style={{ background: "var(--paper)", padding: "20px", border: "1px solid var(--line)" }}>
-                  <strong style={{ display: "block", marginBottom: "6px" }}>Thời gian hãm</strong>
-                  <p style={{ margin: 0, fontSize: "11px" }}>Hãm từ 2 đến 3 phút. Rót hết nước trà ra chén tống rồi mới chia đều ra các chén quân.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "reviews" && (
-            <div style={{ gridColumn: "span 2" }}>
-              <div className="tab-title">Nhận xét từ người sành trà</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "20px" }}>
-                {[
-                  { name: "Trần Quang Minh", star: 5, date: "15/06/2025", text: "Trà rất ngon, đúng chuẩn búp chè Tân Cương. Hương cốm ngào ngạt, hậu ngọt lưu luyến." },
-                  { name: "Nguyễn Hải Yến", star: 5, date: "08/06/2025", text: "Bao bì hút chân không rất kín đáo, giữ nguyên hương vị. Uống mỗi sáng rất sảng khoái." }
-                ].map((r, i) => (
-                  <div key={i} style={{ background: "var(--paper)", padding: "16px", border: "1px solid var(--line)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "11px" }}>
-                      <strong>{r.name}</strong>
-                      <span style={{ color: "var(--gold)" }}>{"★".repeat(r.star)}</span>
-                    </div>
-                    <p style={{ margin: 0, fontSize: "11px", color: "var(--muted)" }}>"{r.text}"</p>
-                    <small style={{ color: "var(--muted)", fontSize: "9px" }}>{r.date}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <TeaRecommendations productId={p.id} onSelectProduct={onSelectProduct} onAddToCart={onAddToCart} />
-    </main>
-  );
+  return <DemoProductDetail product={product} onAddToCart={onAddToCart} onBuyNow={onBuyNow} navigate={navigate} favorite={favorites.includes(product.id)} onToggleFavorite={()=>onToggleFavorite(product.id)} onSelectProduct={onSelectProduct} customer={customer}/>;
 }
 
 /* ========================================================
    CART & CHECKOUT
    ======================================================== */
-function Cart({
-  cart,
-  updateCart,
-  navigate
-}: {
-  cart: CartLine[];
-  updateCart: (id: number, quantity: number | null) => Promise<void>;
-  navigate: (p: Page) => void;
-}) {
-  const total = cart.reduce((s, x) => s + x.product.price * x.qty, 0);
-  const qty = (id: number, delta: number) => {
-    const item = cart.find(x => x.product.id === id);
-    if (item) void updateCart(id, Math.max(1, item.qty + delta));
-  };
-
-  return (
-    <main className="page simple-page">
-      <div className="simple-heading">
-        <span>Giỏ hàng của bạn</span>
-        <p>{cart.length} sản phẩm đang chờ bạn</p>
-      </div>
-      <div className="cart-layout">
-        <section className="cart-items">
-          <div className="cart-table-head">
-            <span>Sản phẩm</span>
-            <span>Số lượng</span>
-            <span>Thành tiền</span>
-          </div>
-          {cart.length === 0 ? (
-            <div className="empty">
-              <Icon name="bag" size={42} />
-              <strong>Giỏ hàng đang trống</strong>
-              <Button onClick={() => navigate("explore")}>Khám phá sản phẩm</Button>
-            </div>
-          ) : (
-            cart.map((x) => (
-              <div className="cart-row" key={x.product.id}>
-                <img src={x.product.image} alt="" />
-                <div className="cart-name">
-                  <small>{x.product.type}</small>
-                  <strong>{x.product.name}</strong>
-                  <span>{x.product.weight}</span>
-                  <button onClick={() => void updateCart(x.product.id, null)}>
-                    <Icon name="trash" size={16} /> Xóa
-                  </button>
-                </div>
-                <div className="quantity">
-                  <button onClick={() => qty(x.product.id, -1)}>
-                    <Icon name="minus" size={15} />
-                  </button>
-                  <span>{x.qty}</span>
-                  <button onClick={() => qty(x.product.id, 1)}>
-                    <Icon name="plus" size={15} />
-                  </button>
-                </div>
-                <strong className="row-price">{money(x.product.price * x.qty)}</strong>
-              </div>
-            ))
-          )}
-          <button className="continue" onClick={() => navigate("explore")}>
-            <Icon name="arrow" /> Tiếp tục mua sắm
-          </button>
-        </section>
-        <aside className="order-summary">
-          <div className="summary-title">Tóm tắt đơn hàng</div>
-          <div>
-            <span>Tạm tính</span>
-            <strong>{money(total)}</strong>
-          </div>
-          <div>
-            <span>Phí vận chuyển</span>
-            <strong>{"Miễn phí"}</strong>
-          </div>
-          <div className="coupon">
-            <input placeholder="Mã ưu đãi" />
-            <button>Áp dụng</button>
-          </div>
-          <div className="total">
-            <span>Tổng cộng</span>
-            <strong>{money(total)}</strong>
-          </div>
-          <Button onClick={() => navigate("checkout")} disabled={total === 0}>
-            Thanh toán <Icon name="arrow" />
-          </Button>
-          <small>Thanh toán an toàn · Bảo mật thông tin</small>
-        </aside>
-      </div>
-    </main>
-  );
+function Cart({cart,updateCart,navigate,onCheckout,userId,onSelectProduct}:{cart:CartLine[];updateCart:(id:number,q:number|null)=>Promise<void>;navigate:(p:Page)=>void;onCheckout:(ids:number[])=>void;userId:string;onSelectProduct:(p:Product)=>void}) {
+ const [selection,setSelection]=useState<{owner:string;ids:number[]}>({owner:userId,ids:[]});
+ const ids=selection.owner===userId?selection.ids:[];
+ const eligible=cart.filter(x=>x.cartItemId&&x.available!==false&&x.qty>0);
+ const chosen=eligible.filter(x=>ids.includes(x.cartItemId!));
+ const all=eligible.length>0&&chosen.length===eligible.length;
+ const toggle=(id:number)=>setSelection({owner:userId,ids:ids.includes(id)?ids.filter(x=>x!==id):[...ids,id]});
+ return <main className="page cart-experience"><div className="breadcrumbs">Trang chủ › Giỏ hàng</div><h1>Giỏ hàng của bạn</h1><p>{cart.length} sản phẩm trong giỏ hàng</p><div className="cart-layout"><section className="cart-items"><div className="cart-table-head"><label><input type="checkbox" aria-label="Chọn tất cả sản phẩm hợp lệ" checked={all} onChange={()=>setSelection({owner:userId,ids:all?[]:eligible.map(x=>x.cartItemId!)})}/> Chọn tất cả ({eligible.length})</label><span>Số lượng</span><span>Thành tiền</span></div>
+ {cart.length===0&&<p>Giỏ hàng đang trống.</p>}{cart.map(x=><div className="cart-row" key={x.cartItemId??x.product.id}><label><input type="checkbox" aria-label={`Chọn mua ${x.product.name}`} disabled={!x.cartItemId||x.available===false} checked={!!x.cartItemId&&chosen.some(c=>c.cartItemId===x.cartItemId)} onChange={()=>x.cartItemId&&toggle(x.cartItemId)}/></label><img src={x.product.image||"/placeholder-teasmart.svg"} alt={x.product.name}/><div className="cart-name"><strong>{x.product.name}</strong>{x.shopName&&<small>{x.shopName}</small>}<span>{x.product.weight||"Quy cách theo sản phẩm"}</span>{x.available===false&&<small>{x.availabilityReason||"Hiện không thể đặt"}</small>}<button onClick={()=>void updateCart(x.product.id,null)}>Xóa</button></div><div className="quantity"><button aria-label={`Giảm ${x.product.name}`} disabled={x.qty<=1} onClick={()=>void updateCart(x.product.id,x.qty-1)}>−</button><span>{x.qty}</span><button aria-label={`Tăng ${x.product.name}`} disabled={x.available===false} onClick={()=>void updateCart(x.product.id,x.qty+1)}>+</button></div><strong className="row-price">{money(x.product.price*x.qty)}</strong></div>)}
+ <button className="continue" onClick={()=>navigate("explore")}>← Tiếp tục mua sắm</button></section><aside className="order-summary"><h2>Tóm tắt đơn hàng</h2><div><span>Đã chọn ({chosen.length} sản phẩm)</span><strong>{money(chosen.reduce((sum,x)=>sum+x.product.price*x.qty,0))}</strong></div><p>Phí vận chuyển và tổng tiền chính thức được xác nhận từ hệ thống khi đặt hàng.</p>{new Set(chosen.map(x=>x.shopId??null)).size>1&&<p role="alert">Vui lòng bỏ chọn sản phẩm của gian hàng khác để thanh toán một gian hàng mỗi lần.</p>}<Button disabled={!chosen.length || new Set(chosen.map(x=>x.shopId??null)).size>1} onClick={()=>onCheckout(chosen.map(x=>x.cartItemId!))}>Mua hàng ({chosen.length}) →</Button><small>Bạn sẽ chọn địa chỉ và phương thức thanh toán ở bước tiếp theo.</small></aside></div><CartCatalog cartProductIds={cart.map(x=>x.product.id)} onSelectProduct={onSelectProduct} onBrowse={()=>navigate("explore")}/></main>;
 }
 
 /* ========================================================
    AI TEA CONSULTANT (Intact as requested in Section 13)
    ======================================================== */
-
-function LeafDisease() {
-  const input = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "ready" | "loading" | "result">("idle");
-
-  const upload = (file?: File) => {
-    if (!file) return;
-    setPreview(URL.createObjectURL(file));
-    setStatus("ready");
-  };
-
-  const analyze = () => {
-    setStatus("loading");
-    setTimeout(() => setStatus("result"), 1600);
-  };
-
-  return (
-    <main className="page leaf-page">
-      <section className="leaf-hero">
-        <span><Icon name="camera" size={30} /></span>
-        <div className="eyebrow">Công cụ hỗ trợ người trồng chè</div>
-        <div className="page-title">
-          AI hỗ trợ phân loại<br />tình trạng lá chè
-        </div>
-        <p>Tải lên ảnh lá chè rõ nét để nhận thông tin tham khảo nhanh về tình trạng của cây.</p>
-      </section>
-
-      <section className="leaf-workspace">
-        <div className="upload-card">
-          <div className="step-label">Bước 1 · Tải ảnh lên</div>
-          <button
-            className={`dropzone ${preview ? "has-image" : ""}`}
-            onClick={() => input.current?.click()}
-            onDrop={(e) => {
-              e.preventDefault();
-              upload(e.dataTransfer.files[0]);
-            }}
-            onDragOver={(e) => e.preventDefault()}
-          >
-            {preview ? (
-              <>
-                <img src={preview} alt="Ảnh lá chè đã tải lên" />
-                <span className="change-image">Chọn ảnh khác</span>
-              </>
-            ) : (
-              <>
-                <span><Icon name="upload" size={30} /></span>
-                <strong>Kéo thả ảnh lá chè vào đây</strong>
-                <small>hoặc chọn ảnh JPG, PNG từ thiết bị · Tối đa 10MB</small>
-                <b>Chọn ảnh từ thiết bị</b>
-              </>
-            )}
-          </button>
-          <input
-            ref={input}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => upload(e.target.files?.[0])}
-          />
-
-          <div className="photo-tips">
-            <strong>Mẹo chụp ảnh tốt</strong>
-            <span>Đủ ánh sáng tự nhiên</span>
-            <span>Lá nằm trọn trong khung hình</span>
-            <span>Ảnh rõ nét, không rung</span>
-          </div>
-
-          <Button onClick={analyze} disabled={!preview || status === "loading"}>
-            {status === "loading" ? (
-              <><span className="loader" /> Đang phân tích ảnh lá chè...</>
-            ) : (
-              <><Icon name="spark" /> Phân tích bằng AI</>
-            )}
-          </Button>
-        </div>
-
-        <div className="result-area">
-          {status === "result" ? (
-            <div className="result-card">
-              <div className="result-head">
-                <span><Icon name="check" /></span>
-                <div>
-                  <small>Kết quả phân loại</small>
-                  <strong>Có dấu hiệu sâu bệnh</strong>
-                </div>
-                <b>92% tin cậy</b>
-              </div>
-              <div className="result-image">
-                <img src={preview!} alt="" />
-                <span>Khu vực cần chú ý</span>
-              </div>
-              <div className="severity">
-                <span>Mức độ tham khảo</span>
-                <div><i /><i /><i /><i /><i /></div>
-                <strong>Trung bình</strong>
-              </div>
-              <div className="finding">
-                <strong>Thông tin tham khảo</strong>
-                <p>
-                  Hình ảnh có một số đặc điểm tương đồng với nhóm bệnh đốm lá: vùng đổi màu, viền nâu và mô lá không đều.
-                </p>
-              </div>
-              <div className="recommendation">
-                <strong>Khuyến nghị xử lý ban đầu</strong>
-                <ul>
-                  <li>Cách ly và theo dõi các lá có dấu hiệu tương tự.</li>
-                  <li>Giữ nương chè thông thoáng, tránh độ ẩm kéo dài.</li>
-                  <li>Liên hệ cán bộ nông nghiệp địa phương để xác định chính xác.</li>
-                </ul>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPreview(null);
-                  setStatus("idle");
-                }}
-              >
-                Phân tích ảnh khác
-              </Button>
-              <small className="disclaimer">
-                Kết quả chỉ mang tính hỗ trợ tham khảo, không thay thế chẩn đoán của chuyên gia nông nghiệp.
-              </small>
-            </div>
-          ) : (
-            <div className="result-placeholder">
-              <div><Icon name="leaf" size={42} /></div>
-              <strong>Kết quả sẽ hiển thị tại đây</strong>
-              <p>Sau khi tải ảnh và nhấn phân tích, TeaSmart AI sẽ cung cấp thông tin tham khảo về lá chè.</p>
-            </div>
-          )}
-        </div>
-      </section>
-    </main>
-  );
-}
 
 /* ========================================================
    ACCOUNT PAGE (with Section 5 Wishlist tab)
@@ -1208,8 +661,10 @@ function Account({
   orders,
   currentUser,
   onLogout,
-  navigate
+  navigate,
+  onOpenOrder
 }: {
+  onOpenOrder: (id: number) => void;
   favorites: number[];
   products: Product[];
   onAddToCart: (p: Product) => void;
@@ -1220,13 +675,18 @@ function Account({
   onLogout?: () => void;
   navigate?: (p: Page) => void;
 }) {
-  const [tab, setTab] = useState("Sản phẩm yêu thích");
-  const [profileSaved, setProfileSaved] = useState(false);
+  const [tab, setTab] = useState(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "orders") return "Đơn hàng của tôi";
+    if (tab === "favorites") return "Sản phẩm yêu thích";
+    if (tab === "reviews") return "Đánh giá của tôi";
+    return "Hồ sơ cá nhân";
+  });
   const favoriteProducts = products.filter((p) => favorites.includes(p.id));
 
-  const userName = currentUser?.name || "Nguyễn An";
-  const userEmail = currentUser?.email || "nguyenan@email.com";
-  const userPhone = currentUser?.phone || "0912 345 678";
+  const userName = currentUser?.name || "Khách";
+  const userEmail = currentUser?.email || "Chưa đăng nhập";
+  const userPhone = currentUser?.phone || "Chưa bổ sung";
   const userInitials = userName
     .split(" ")
     .filter(Boolean)
@@ -1239,12 +699,22 @@ function Account({
     if (x === "Đăng xuất") {
       onLogout?.();
     } else {
+      if (x !== tab) {
+        const tabParam: Record<string, string> = {
+          "Hồ sơ cá nhân": "profile",
+          "Đơn hàng của tôi": "orders",
+          "Sản phẩm yêu thích": "favorites",
+          "Đánh giá của tôi": "reviews",
+        };
+        const nextParam = tabParam[x];
+        if (nextParam) window.history.pushState(null, "", `/account?tab=${nextParam}`);
+      }
       setTab(x);
     }
   };
 
   return (
-    <main className="page account-page">
+    <main className="page account-page account-experience">
       {!currentUser && (
         <div style={{ background: "var(--cream)", border: "1px solid var(--line)", padding: "12px 18px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px" }}>
           <span>Bạn đang xem tài khoản ở chế độ khách. Đăng nhập để đồng bộ dữ liệu.</span>
@@ -1258,27 +728,18 @@ function Account({
         </div>
       )}
 
-      <div className="account-cover">
-        <div className="account-avatar">{userInitials}</div>
-        <div>
-          <div className="detail-title">{userName}</div>
-          <p>
-            {currentUser?.joinDate
-              ? `Thành viên TeaSmart từ tháng ${currentUser.joinDate}`
-              : "Thành viên TeaSmart từ tháng 03/2024"}
-          </p>
-        </div>
-      </div>
-
+      <div className="account-breadcrumb">Trang chủ › Tài khoản › {tab}</div>
       <div className="account-layout">
         <aside>
+          <div className="account-cover"><div className="account-avatar">{currentUser?.avatarUrl?<img src={currentUser.avatarUrl} alt="Ảnh đại diện"/>:userInitials}</div><strong>{userName}</strong><small>Thành viên TeaSmart</small></div>
           {[
-            "Sản phẩm yêu thích",
-            "Đơn hàng của tôi",
             "Hồ sơ cá nhân",
+            "Đơn hàng của tôi",
+            "Sản phẩm yêu thích",
             "Đánh giá của tôi",
+            ...(currentUser?.role === "USER" && currentUser.sellerEnabled ? ["seller-entry"] : []),
             "Đăng xuất"
-          ].map((x) => (
+          ].map((x) => x === "seller-entry" ? <SellerAccountLink key={x} userId={currentUser!.id} onOpen={()=>navigate?.("seller")} /> : (
             <button
               className={tab === x ? "active" : ""}
               key={x}
@@ -1292,6 +753,7 @@ function Account({
         </aside>
 
         <section>
+          {tab==="Hồ sơ cá nhân"&&<div className="profile-welcome"><span className="eyebrow">XIN CHÀO</span><h1>{userName}</h1><p>Cảm ơn bạn đã đồng hành cùng TeaSmart.</p></div>}
           <div className="account-heading">{tab}</div>
 
           {/* Tab 1: Wishlist */}
@@ -1332,53 +794,11 @@ function Account({
             </div>
           )}
 
-          {/* Tab 2: Orders */}
-          {tab === "Đơn hàng của tôi" && (
-            <>
-              {orders.map((ord) => (
-                <article className="order-card" key={ord.id}>
-                  <div>
-                    <span>Mã đơn <strong>{ord.id}</strong></span>
-                    <span>{ord.date}</span>
-                    <b style={{ color: "var(--leaf)" }}>{ord.status}</b>
-                  </div>
-                  <div>
-                    <img src={ord.items[0]?.product.image || photos.tea} alt="" />
-                    <span>
-                      <strong>{ord.items[0]?.product.name || "Sản phẩm chè"}</strong>
-                      <small>{ord.items.length} mặt hàng · {ord.paymentMethod} · {ord.paymentStatus}</small>
-                    </span>
-                    <strong>{money(ord.total)}</strong>
-                  </div>
-                  <button>Xem chi tiết <Icon name="arrow" /></button>
-                </article>
-              ))}
-            </>
-          )}
-
-          {/* Tab 3: Profile */}
-          {tab === "Hồ sơ cá nhân" && (
-            <div className="profile-card">
-              {profileSaved && (
-                <div style={{ background: "#eef7ee", border: "1px solid #c7d6c2", color: "var(--forest)", padding: "10px 14px", borderRadius: "3px", marginBottom: "16px", fontSize: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Icon name="check" size={16} /> Đã lưu thông tin hồ sơ của bạn thành công!
-                </div>
-              )}
-              <div className="form-grid">
-                <label>Họ và tên<input key={userName} defaultValue={userName} /></label>
-                <label>Số điện thoại<input key={userPhone} defaultValue={userPhone} /></label>
-                <label className="full">Email<input key={userEmail} defaultValue={userEmail} /></label>
-              </div>
-              <Button onClick={() => setProfileSaved(true)}>Lưu thay đổi</Button>
-            </div>
-          )}
+          {tab === "Đơn hàng của tôi" && <CustomerOrders products={products} userId={currentUser?.role === "USER" ? String(currentUser.id) : null} onOpen={onOpenOrder}/>}
+          {tab === "Hồ sơ cá nhân" && currentUser && <AccountSettings key={String(currentUser.id)} user={currentUser}/>}
 
           {/* Other Tabs */}
-          {tab === "Đánh giá của tôi" && (
-            <div style={{ padding: "40px 0", color: "var(--muted)" }}>
-              Tính năng đánh giá của tôi đang hiển thị các sản phẩm bạn đã mua và gửi phản hồi.
-            </div>
-          )}
+          {tab === "Đánh giá của tôi" && <MyReviews products={products}/>}
         </section>
       </div>
     </main>
@@ -1536,7 +956,12 @@ function getInitialRoute(): { page: Page; adminSubView: AdminSubView } {
     return { page: "home", adminSubView: "Dashboard" };
   }
   const path = window.location.pathname;
+  if (path === "/quen-mat-khau") return { page: "forgot-password", adminSubView: "Dashboard" };
+  if (path === "/dat-lai-mat-khau") return { page: "reset-password", adminSubView: "Dashboard" };
+  if (path === "/seller") return { page: "seller", adminSubView: "Dashboard" };
+  if (/^\/account\/orders\/[1-9][0-9]*$/.test(path)) return { page: "order-detail", adminSubView: "Dashboard" };
   if (path === "/payment/vnpay-return") return { page: "payment-return", adminSubView: "Dashboard" };
+  if (path === "/payment/incomplete") return { page: "payment-incomplete", adminSubView: "Dashboard" };
   if (path === "/dang-nhap" || path === "/login") {
     return { page: "login", adminSubView: "Dashboard" };
   }
@@ -1583,6 +1008,8 @@ function getPathForPage(p: Page, adminSubView?: AdminSubView): string {
   switch (p) {
     case "home":
       return "/";
+    case "forgot-password": return "/quen-mat-khau";
+    case "reset-password": return "/dat-lai-mat-khau";
     case "login":
       return "/dang-nhap";
     case "register":
@@ -1603,12 +1030,16 @@ function getPathForPage(p: Page, adminSubView?: AdminSubView): string {
       return "/cart";
     case "payment-return":
       return "/payment/vnpay-return";
+    case "payment-incomplete":
+      return "/payment/incomplete";
     case "checkout":
       return "/checkout";
     case "ai":
       return "/ai";
     case "leaf":
       return "/leaf";
+    case "seller":
+      return "/seller";
     case "account":
       return "/account";
     case "about":
@@ -1626,19 +1057,27 @@ function getPathForPage(p: Page, adminSubView?: AdminSubView): string {
 export default function App() {
   const initialRoute = useMemo(() => getInitialRoute(), []);
   const [page, setPage] = useState<Page>(initialRoute.page);
+  const [chatOpenSignal, setChatOpenSignal] = useState(0);
   const [adminSubView, setAdminSubView] = useState<AdminSubView>(initialRoute.adminSubView);
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [ownedOrders, setOwnedOrders] = useState<{ owner: string; items: Order[] }>({ owner: "", items: [] });
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [regions, setRegions] = useState<TeaRegion[]>(teaRegionsData);
   const [shops, setShops] = useState<TeaShop[]>(teaShopsData);
 
   // Authentication state
-  const [checkoutAuthLoading, setCheckoutAuthLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const orders = ownedOrders.owner === String(currentUser?.id) ? ownedOrders.items : [];
+  const setOrders = (next: Order[] | ((prev: Order[]) => Order[])) => {
+    const owner = String(currentUser?.id);
+    setOwnedOrders(prev => ({ owner, items: typeof next === "function" ? next(prev.owner === owner ? prev.items : []) : next }));
+  };
+  const [authState, setAuthState] = useState<"loading" | "ready" | "guest" | "error">("loading");
+  const [authRetry, setAuthRetry] = useState(0);
+  useEffect(()=>{const fn=()=>setAuthRetry(n=>n+1);window.addEventListener("teasmart-profile-updated",fn);return()=>window.removeEventListener("teasmart-profile-updated",fn)},[]);
+  const [routeRevision, setRouteRevision] = useState(0);
   const [registeredUsers, setRegisteredUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem("teasmart_registered_users");
@@ -1655,11 +1094,40 @@ export default function App() {
   const [selectedShopId, setSelectedShopId] = useState<string>("htx-hao-dat");
 
   // State: Cart & Wishlist
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [ownedCart, setOwnedCart] = useState<{ owner: string; items: CartLine[] }>({ owner: "", items: [] });
+  const cart = ownedCart.owner === String(currentUser?.id) ? ownedCart.items : [];
+  const setCart = (items: CartLine[]) => setOwnedCart({ owner: String(currentUser?.id), items });
   const [commerceError, setCommerceError] = useState("");
-  const [favorites, setFavorites] = useState<number[]>([1, 4]); // Initial favorited products
+  const [wishlist, setWishlist] = useState<{ owner: string; products: ApiProduct[] }>({ owner: "", products: [] });
+  const favorites = currentUser?.role === "USER" && wishlist.owner === String(currentUser.id) ? wishlist.products.map(p => p.productId) : [];
+  const wishlistBusy = useRef(false);
+  const activeUserId = useRef(currentUser?.id); activeUserId.current = currentUser?.id;
 
+  const [buyNow, setBuyNow] = useState<{owner:string;product:Product;qty:number;intentId?:string}|null>(() => {
+    try { const d = JSON.parse(sessionStorage.getItem("teasmart_buy_now") ?? "null"); return d && typeof d.owner === "string" && d.product?.id && Number.isInteger(d.qty) && d.qty > 0 ? d : null; } catch { return null; }
+  });
+  const [buyAgain, setBuyAgain] = useState<{ owner: string; items: { product: Product; quantity: number }[] } | null>(() => {
+    try {
+      const draft = JSON.parse(sessionStorage.getItem("teasmart_buy_again") ?? "null");
+      return draft && typeof draft.owner === "string" && Array.isArray(draft.items)
+        && draft.items.length > 0 && draft.items.every((item: any) => item?.product?.id && Number.isInteger(item.quantity) && item.quantity > 0)
+        ? draft : null;
+    } catch { return null; }
+  });
+  const [selectedCart,setSelectedCart]=useState<{owner:string;items:{cartItemId:number;quantity:number}[]}|null>(()=>{try{return JSON.parse(sessionStorage.getItem("teasmart_selected_cart")??"null")}catch{return null}});
+  const selectedDraft=selectedCart?.owner===String(currentUser?.id)?selectedCart:null;
+  const checkoutSelected=(ids:number[])=>{
+    if(!currentUser||readPendingCheckout(String(currentUser.id)))return;
+    const items=cart.filter(x=>x.cartItemId&&ids.includes(x.cartItemId)&&x.available!==false).map(x=>({cartItemId:x.cartItemId!,quantity:x.qty}));
+    if(!items.length)return;
+    const draft={owner:String(currentUser.id),items};setSelectedCart(draft);sessionStorage.setItem("teasmart_selected_cart",JSON.stringify(draft));setBuyNow(null);sessionStorage.removeItem("teasmart_buy_now");setBuyAgain(null);sessionStorage.removeItem("teasmart_buy_again");navigate("checkout");
+  };
+  const directPurchase = buyNow?.owner === String(currentUser?.id) ? buyNow : null;
   const navigate = (p: Page, subView?: AdminSubView) => {
+    if (p === "checkout") sessionStorage.removeItem(checkoutReceiptKey);
+    if (p !== "checkout") { setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again"); }
+    if (p === "cart") { setBuyNow(null); sessionStorage.removeItem("teasmart_buy_now"); }
+
     setPage(p);
     if (p === "admin") {
       if (subView) setAdminSubView(subView);
@@ -1674,6 +1142,8 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const route = getInitialRoute();
+      if (route.page !== "checkout") { setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again"); }
+      setRouteRevision(n => n + 1);
       setPage(route.page);
       setAdminSubView(route.adminSubView);
     };
@@ -1682,10 +1152,23 @@ export default function App() {
   }, []);
 
   const handleLogin = (user: User) => {
-    setCurrentUser(user); setAuthSuccessMsg("");
+    setCurrentUser(user); setAuthState("ready"); setAuthSuccessMsg("");
+    if (user.role === "USER" && sessionStorage.getItem("teasmart_seller_return") === "/seller") {
+      sessionStorage.removeItem("teasmart_seller_return"); navigate("seller"); return;
+    }
+    const accountReturn = sessionStorage.getItem("teasmart_account_return");
+    if (user.role === "USER" && accountReturn === "/account?tab=favorites") {
+      sessionStorage.removeItem("teasmart_account_return");
+      window.history.replaceState(null, "", accountReturn);
+      setRouteRevision(n => n + 1); setPage("account"); return;
+    }
+    const detailReturn = sessionStorage.getItem("teasmart_order_return");
+    if (user.role === "USER" && detailReturn && /^\/account\/orders\/[1-9][0-9]*$/.test(detailReturn)) {
+      sessionStorage.removeItem("teasmart_order_return"); window.history.replaceState(null, "", detailReturn); setRouteRevision(n => n + 1); setPage("order-detail"); return;
+    }
     const returnPath = sessionStorage.getItem("teasmart_payment_return");
-    if (user.role === "USER" && returnPath?.startsWith("/payment/vnpay-return?")) {
-      sessionStorage.removeItem("teasmart_payment_return"); window.history.replaceState(null, "", returnPath); setPage("payment-return");
+    if (user.role === "USER" && (returnPath?.startsWith("/payment/vnpay-return?") || returnPath === "/payment/incomplete")) {
+      sessionStorage.removeItem("teasmart_payment_return"); window.history.replaceState(null, "", returnPath); setPage(returnPath === "/payment/incomplete" ? "payment-incomplete" : "payment-return");
     } else navigate(user.role === "ADMIN" ? "admin" : "home", "Dashboard");
   };
 
@@ -1704,10 +1187,15 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    setCurrentUser(null);
-    setCart([]); setOrders([]);
+    setCurrentUser(null); setAuthState("guest");
+    setCart([]); setOrders([]); setWishlist({ owner: "", products: [] });
     sessionStorage.removeItem("teasmart_access_token");
     sessionStorage.removeItem("teasmart_checkout");
+    sessionStorage.removeItem("teasmart_checkout_session");
+    sessionStorage.removeItem("teasmart_payment_return");
+    sessionStorage.removeItem("teasmart_account_return");
+    sessionStorage.removeItem("teasmart_buy_now"); setBuyNow(null);
+    sessionStorage.removeItem("teasmart_buy_again"); setBuyAgain(null);
     try {
       localStorage.removeItem("teasmart_current_user");
     } catch {
@@ -1717,18 +1205,34 @@ export default function App() {
   };
 
   async function refreshCart() { setCart(mapCart(await api<ApiCart>("/cart"))); }
-  const addToCart = async (product: Product, _weight?: string) => {
+  const addToCart = async (product: Product, _weight?: string, quantity = 1) => {
+    if (!Number.isInteger(quantity) || quantity < 1) return false;
     if (!currentUser || currentUser.role !== "USER") { navigate("login"); return false; }
     if (!products.some(p => p.id === product.id && p.name === product.name)) {
       setCommerceError("Sản phẩm này chưa có trong danh mục bán hàng hiện tại."); return false;
     }
     try {
-      setCart(mapCart(await api<ApiCart>("/cart/items", { method: "POST", body: JSON.stringify({ productId: product.id, quantity: 1 }) })));
+      setCart(mapCart(await api<ApiCart>("/cart/items", { method: "POST", body: JSON.stringify({ productId: product.id, quantity }) })));
       setCommerceError(""); return true;
     } catch (e) { setCommerceError(errorMessage(e)); return false; }
   };
-  const handleBuyNow = async (product: Product, weight?: string) => {
-    if (await addToCart(product, weight)) navigate("checkout");
+  const handleBuyNow = (product: Product, weight?: string, quantity = 1) => {
+    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return; }
+    if (!Number.isInteger(quantity) || quantity < 1) return;
+    setSelectedCart(null);sessionStorage.removeItem("teasmart_selected_cart");
+    setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again");
+    const draft = { owner: String(currentUser.id), product: { ...product, weight: weight ?? product.weight }, qty: quantity, intentId: crypto.randomUUID() };
+    sessionStorage.setItem("teasmart_buy_now", JSON.stringify(draft));
+    setBuyNow(draft); navigate("checkout");
+  };
+  const handleBuyAgain = (items: { product: Product; quantity: number }[]) => {
+    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return; }
+    if (!items.length || items.some(item => !Number.isInteger(item.quantity) || item.quantity < 1)) return;
+    if (readPendingCheckout(String(currentUser.id))) { setCommerceError("Vui lòng kiểm tra yêu cầu checkout trước đó trước khi mua lại."); return; }
+    setBuyNow(null); sessionStorage.removeItem("teasmart_buy_now");
+    const draft = { owner: String(currentUser.id), items };
+    setBuyAgain(draft); sessionStorage.setItem("teasmart_buy_again", JSON.stringify(draft));
+    navigate("checkout");
   };
   const updateCart = async (productId: number, quantity: number | null) => {
     const item = cart.find(x => x.product.id === productId);
@@ -1746,31 +1250,62 @@ export default function App() {
         const first = await api<ApiPage<ApiProduct>>("/products?size=50");
         const rest = await Promise.all(Array.from({ length: Math.max(0, first.totalPages - 1) }, (_, i) =>
           api<ApiPage<ApiProduct>>(`/products?size=50&page=${i + 1}`)));
-        if (live) setProducts([first, ...rest].flatMap(p => p.content).map(mapProduct));
+        if (live) setProducts([first, ...rest].flatMap(p => p.content).filter(isCustomerTasteProduct).map(mapProduct));
       } catch (e) { if (live) setCommerceError(errorMessage(e)); }
-      if (sessionStorage.getItem("teasmart_access_token")) {
-        try { const user = mapUser(await api<ApiUser>("/users/me")); if (live) setCurrentUser(user); }
-        catch { sessionStorage.removeItem("teasmart_access_token"); }
-      }
-      if (live) setCheckoutAuthLoading(false);
     })(); return () => { live = false; };
   }, []);
   useEffect(() => {
     let live = true;
     if (currentUser?.role === "USER") {
       void api<ApiCart>("/cart").then(c => { if (live) setCart(mapCart(c)); }).catch(e => { if (live) setCommerceError(errorMessage(e)); });
-      void api<ApiPage<{ orderId: number }>>("/orders?size=50").then(async result => {
-        const details = await Promise.all(result.content.map(o => api<ApiOrder>(`/orders/${o.orderId}`)));
-        if (live) setOrders(details.map(mapOrder));
-      }).catch(e => { if (live) setCommerceError(errorMessage(e)); });
+
     }
     return () => { live = false; };
   }, [currentUser?.id, page]);
 
-  const toggleFavorite = (productId: number) => {
-    setFavorites((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
+  useEffect(() => {
+    let live = true; setAuthState("loading");
+    const restoringToken = sessionStorage.getItem("teasmart_access_token");
+    if (!restoringToken) { setAuthState("guest"); return; }
+    void api<ApiUser>("/users/me").then(u => { if (live && sessionStorage.getItem("teasmart_access_token") === restoringToken) { setCurrentUser(mapUser(u)); setAuthState("ready"); } })
+      .catch(e => { if (live && (sessionStorage.getItem("teasmart_access_token") === restoringToken || e instanceof ApiError && e.status === 401 && !sessionStorage.getItem("teasmart_access_token"))) { setAuthState(e instanceof ApiError && e.status === 401 ? "guest" : "error"); } });
+    return () => { live = false; };
+  }, [authRetry]);
+  const openOrder = (id: number) => {
+    setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again");
+    window.history.pushState(null, "", `/account/orders/${id}`); setRouteRevision(n => n + 1); setPage("order-detail"); window.scrollTo(0, 0);
+  };
+  const openOrders = () => {
+    setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again");
+    window.history.pushState(null, "", "/account?tab=orders"); setRouteRevision(n => n + 1); setPage("account"); window.scrollTo(0, 0);
+  };
+  const openFavorites = () => {
+    if (!currentUser) {
+      sessionStorage.setItem("teasmart_account_return", "/account?tab=favorites");
+      navigate("login");
+      return;
+    }
+    window.history.pushState(null, "", "/account?tab=favorites"); setRouteRevision(n => n + 1); setPage("account"); window.scrollTo(0, 0);
+  };
+
+  useEffect(() => {
+    let live = true; setCart([]); setOrders([]); setWishlist({ owner: "", products: [] }); wishlistBusy.current = false;
+    if (currentUser?.role === "USER") {
+      const owner = String(currentUser.id);
+      void api<ApiProduct[]>("/wishlist").then(products => { if (live) setWishlist({ owner, products }); })
+        .catch(e => { if (live) setCommerceError(errorMessage(e)); });
+    }
+    return () => { live = false; };
+  }, [currentUser?.id]);
+  const toggleFavorite = async (productId: number) => {
+    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return; }
+    if (wishlistBusy.current) return;
+    const owner = currentUser.id; wishlistBusy.current = true;
+    try {
+      const products = await api<ApiProduct[]>(`/wishlist/products/${productId}`, { method: favorites.includes(productId) ? "DELETE" : "PUT" });
+      if (activeUserId.current === owner) { setWishlist({ owner: String(owner), products }); setCommerceError(""); }
+    } catch (e) { if (activeUserId.current === owner) setCommerceError(errorMessage(e)); }
+    finally { if (activeUserId.current === owner) wishlistBusy.current = false; }
   };
 
   const handleSelectProduct = (prod: Product) => {
@@ -1789,33 +1324,16 @@ export default function App() {
   };
 
   // Admin handlers
-  const handleAddProduct = (newProd: Omit<Product, "id">) => {
-    const id = Date.now();
-    setProducts((prev) => [{ id, ...newProd }, ...prev]);
+  const refreshProductCatalog = async () => {
+    const first = await api<ApiPage<ApiProduct>>("/products?size=50");
+    const rest = await Promise.all(Array.from({ length: Math.max(0, first.totalPages - 1) }, (_, i) =>
+      api<ApiPage<ApiProduct>>(`/products?size=50&page=${i + 1}`)));
+    setProducts([first, ...rest].flatMap(p => p.content).filter(isCustomerTasteProduct).map(mapProduct));
   };
 
-  const handleUpdateProduct = (updated: Product) => {
-    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-  };
-
-  const handleDeleteProduct = (id: number) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const handleAddCategory = (name: string, desc: string) => {
-    setCategories((prev) => [
-      ...prev,
-      { id: `cat-${Date.now()}`, name, description: desc, productsCount: 0 }
-    ]);
-  };
-
-  const handleUpdateCategory = (cat: Category) => {
-    setCategories((prev) => prev.map((c) => (c.id === cat.id ? cat : c)));
-  };
-
-  const handleDeleteCategory = (id: string) => {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-  };
+  async function refreshCategoryCatalog() {
+    await refreshProductCatalog();
+  }
 
   const handleUpdateOrderStatus = (orderId: string, status: Order["status"]) => {
     setOrders((prev) =>
@@ -1837,33 +1355,12 @@ export default function App() {
     );
   };
 
-  const handleAddRegion = (reg: TeaRegion) => {
-    setRegions((prev) => [reg, ...prev]);
-  };
-
-  const handleUpdateRegion = (reg: TeaRegion) => {
-    setRegions((prev) => prev.map((r) => (r.id === reg.id ? reg : r)));
-  };
-
-  const handleDeleteRegion = (id: string) => {
-    setRegions((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const handleAddShop = (shop: TeaShop) => {
-    setShops((prev) => [shop, ...prev]);
-  };
-
-  const handleUpdateShop = (shop: TeaShop) => {
-    setShops((prev) => prev.map((s) => (s.id === shop.id ? shop : s)));
-  };
-
-  const handleDeleteShop = (id: string) => {
-    setShops((prev) => prev.filter((s) => s.id !== id));
-  };
-
-  const handleOrderPlaced = (newOrder: Order) => {
+  const handleOrderPlaced = (newOrder: Order, direct = false) => {
     setOrders((prev) => [newOrder, ...prev]);
-    setCart([]);
+    void refreshCart();
+    setSelectedCart(null);sessionStorage.removeItem("teasmart_selected_cart");
+    setBuyNow(null); sessionStorage.removeItem("teasmart_buy_now");
+    setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again");
   };
 
   const count = cart.reduce((s, x) => s + x.qty, 0);
@@ -1879,6 +1376,8 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [page]);
+
+  if (page === "forgot-password" || page === "reset-password") return <PasswordRecovery key={page} reset={page === "reset-password"} navigate={navigate} />;
 
   // Dedicated Login Page (/dang-nhap)
   if (page === "login") {
@@ -1907,28 +1406,15 @@ export default function App() {
     if (currentUser?.role !== "ADMIN") return <main className="page simple-page"><p>Vui lòng đăng nhập tài khoản quản trị viên.</p><Button onClick={() => navigate("login")}>Đăng nhập</Button></main>;
     return (
       <AdminPortal
-        products={products}
-        onAddProduct={handleAddProduct}
-        onUpdateProduct={handleUpdateProduct}
-        onDeleteProduct={handleDeleteProduct}
-        categories={categories}
-        onAddCategory={handleAddCategory}
-        onUpdateCategory={handleUpdateCategory}
-        onDeleteCategory={handleDeleteCategory}
+        onProductsChanged={refreshProductCatalog}
+        onCategoriesChanged={refreshCategoryCatalog}
+        onPlacesChanged={refreshProductCatalog}
         orders={orders}
         onUpdateOrderStatus={handleUpdateOrderStatus}
         customers={customers}
         onUpdateCustomerStatus={handleUpdateCustomerStatus}
         reviews={reviews}
         onToggleReviewStatus={handleToggleReviewStatus}
-        regions={regions}
-        onAddRegion={handleAddRegion}
-        onUpdateRegion={handleUpdateRegion}
-        onDeleteRegion={handleDeleteRegion}
-        shops={shops}
-        onAddShop={handleAddShop}
-        onUpdateShop={handleUpdateShop}
-        onDeleteShop={handleDeleteShop}
         onExitAdmin={() => navigate("home")}
         onLogout={handleLogout}
         currentUser={currentUser}
@@ -1948,13 +1434,14 @@ export default function App() {
         onSelectProduct={handleSelectProduct}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenFavorites={openFavorites}
       />
 
       <div key={page} className="page-transition-wrap">
         {page === "home" && (
           <Home
             products={products}
-            navigate={navigate}
+            navigate={p => p === "ai" ? setChatOpenSignal(n => n + 1) : navigate(p)}
             onSelectProduct={handleSelectProduct}
             onAddToCart={addToCart}
             onBuyNow={handleBuyNow}
@@ -1977,8 +1464,9 @@ export default function App() {
       )}
 
       {commerceError && <p className="page" role="alert">{commerceError}</p>}
-      {page === "product" && currentProduct && (
+      {page === "product" && currentProduct && (currentProduct.image.startsWith("/demo/tea/") ? <DemoProductDetail customer={currentUser?.role === "USER"} key={currentProduct.id} product={currentProduct} onAddToCart={addToCart} onBuyNow={handleBuyNow} navigate={navigate} favorite={favorites.includes(currentProduct.id)} onToggleFavorite={() => toggleFavorite(currentProduct.id)} onSelectProduct={handleSelectProduct} /> :
         <ProductDetail
+          customer={currentUser?.role === "USER"}
           product={currentProduct}
           onAddToCart={addToCart}
           onBuyNow={handleBuyNow}
@@ -1989,78 +1477,31 @@ export default function App() {
         />
       )}
 
-      {page === "tea-regions" && (
-        <TeaRegionsList
-          onSelectRegion={handleSelectRegion}
-          onSelectProduct={handleSelectProduct}
-          onAddToCart={addToCart}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
-          navigate={navigate}
-        />
-      )}
-
-      {page === "tea-region-detail" && (
-        <TeaRegionDetail
-          region={currentRegion}
-          products={products}
-          onSelectProduct={handleSelectProduct}
-          onAddToCart={addToCart}
-          onBuyNow={handleBuyNow}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
-          onBack={() => navigate("tea-regions")}
-        />
-      )}
-
-      {page === "shops" && (
-        <TeaShopsList
-          onSelectShop={handleSelectShop}
-          onSelectProduct={handleSelectProduct}
-          onAddToCart={addToCart}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
-        />
-      )}
-
-      {page === "shop-detail" && (
-        <TeaShopDetail
-          shop={currentShop}
-          products={products}
-          onSelectProduct={handleSelectProduct}
-          onAddToCart={addToCart}
-          onBuyNow={handleBuyNow}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
-          onBack={() => navigate("shops")}
-        />
-      )}
+      {page === "tea-regions" && <><PublicPlaces key="regions-current-hero" kind="regions" products={products} onSelectProduct={handleSelectProduct} heroOnly /><TeaRegionsList onSelectRegion={handleSelectRegion} onSelectProduct={handleSelectProduct} onAddToCart={addToCart} favorites={favorites} onToggleFavorite={toggleFavorite} navigate={navigate} showHero={false} /></>}
+      {page === "tea-region-detail" && <TeaRegionDetail region={currentRegion} products={products} onSelectProduct={handleSelectProduct} onAddToCart={addToCart} onBuyNow={handleBuyNow} favorites={favorites} onToggleFavorite={toggleFavorite} onBack={() => navigate("tea-regions")} />}
+      {page === "shops" && <TeaShopsList onSelectShop={handleSelectShop} onSelectProduct={handleSelectProduct} onAddToCart={addToCart} favorites={favorites} onToggleFavorite={toggleFavorite} />}
+      {page === "shop-detail" && <TeaShopDetail shop={currentShop} products={products} onSelectProduct={handleSelectProduct} onAddToCart={addToCart} onBuyNow={handleBuyNow} favorites={favorites} onToggleFavorite={toggleFavorite} onBack={() => navigate("shops")} />}
 
       {page === "cart" && (
-        <Cart cart={cart} updateCart={updateCart} navigate={navigate} />
+        <Cart key={String(currentUser?.id)} userId={String(currentUser?.id)} cart={cart} updateCart={updateCart} navigate={navigate} onCheckout={checkoutSelected} onSelectProduct={handleSelectProduct} />
       )}
 
-      {page === "payment-return" && <PaymentReturn navigate={navigate} products={products} authState={currentUser ? "ready" : checkoutAuthLoading ? "loading" : "guest"} onAuthRetry={() => window.location.reload()} openOrder={() => navigate("account")} openOrders={() => navigate("account")} />}
+      {page === "payment-return" && <PaymentReturn key={String(currentUser?.id ?? "guest")} navigate={navigate} authState={authState} onAuthRetry={() => setAuthRetry(n => n + 1)} openOrder={openOrder} openOrders={openOrders} products={products} />}
+      {page === "payment-incomplete" && <PaymentIncomplete key={String(currentUser?.id ?? "guest")} userId={currentUser ? String(currentUser.id) : null} authState={authState} navigate={navigate} openOrder={openOrder} />}
+
+      {page === "order-detail" && <CustomerOrderDetail key={`${currentUser?.id}-${routeRevision}`} authState={authState} onAuthRetry={() => setAuthRetry(n => n + 1)} navigate={navigate} openOrders={openOrders} products={products} favorites={favorites} onAddToCart={addToCart} onToggleFavorite={toggleFavorite} onSelectProduct={handleSelectProduct} onBuyAgain={handleBuyAgain} />}
 
       {page === "checkout" && (
-        <PaymentCheckout products={products} key={String(currentUser?.id)} cart={cart} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
+        <PaymentCheckout selectedItems={directPurchase||buyAgain?.owner===String(currentUser?.id)?undefined:selectedDraft?.items} buyNow={directPurchase ? { productId: directPurchase.product.id, quantity: directPurchase.qty, intentId: directPurchase.intentId ?? "legacy" } : undefined} buyAgain={buyAgain?.owner===String(currentUser?.id)?buyAgain.items:undefined} openOrder={openOrder} openOrders={openOrders} key={String(currentUser?.id)} products={products} cart={buyAgain?.owner===String(currentUser?.id)?buyAgain.items.map(item=>({product:item.product,qty:item.quantity})):directPurchase ? [directPurchase] : (selectedDraft?cart.filter(x=>selectedDraft.items.some(i=>x.cartItemId===i.cartItemId)):cart).map(x=>({...x,product:{...x.product,weight:products.find(p=>p.id===x.product.id)?.weight??x.product.weight}}))} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
       )}
 
-      {page === "ai" && (
-        <TeaAdvisor
-          navigate={navigate}
-          onAddToCart={addToCart}
-          customer={currentUser?.role === "USER"}
-          onSelectProduct={handleSelectProduct}
-        />
-      )}
+      {(page === "ai" || page === "leaf") && <LeafAnalysis />}
 
-      {page === "leaf" && <LeafDisease />}
-
+      {page === "seller" && (authState === "loading" ? <main className="page"><p role="status">Đang xác minh phiên đăng nhập…</p></main> : authState === "error" ? <main className="page"><p role="alert">Không thể xác minh phiên đăng nhập.</p><button className="btn btn-outline" onClick={() => setAuthRetry(n => n + 1)}>Thử lại</button></main> : <SellerCenter key={String(currentUser?.id ?? "guest")} user={authState === "guest" ? null : currentUser} onLogin={() => { sessionStorage.setItem("teasmart_seller_return", "/seller"); navigate("login"); }} onShopping={() => navigate("home")} />)}
       {page === "account" && (
-        <Account
+        <Account key={routeRevision} onOpenOrder={openOrder}
           favorites={favorites}
-          products={products}
+          products={[...products, ...wishlist.products.filter(p => !products.some(item => item.id === p.productId)).map(mapProduct)]}
           onAddToCart={addToCart}
           onToggleFavorite={toggleFavorite}
           onSelectProduct={handleSelectProduct}
@@ -2075,8 +1516,9 @@ export default function App() {
       {page === "policy" && <PolicyPage />}
       </div>
 
-      {!["ai", "leaf", "checkout", "admin"].includes(page) && (
-        <Footer navigate={navigate} />
+      <ChatbotWidget key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} onLogin={() => navigate("login")} onProduct={handleSelectProduct} openSignal={chatOpenSignal} />
+      {!["checkout", "admin"].includes(page) && (
+        <Footer navigate={p => p === "ai" ? setChatOpenSignal(n => n + 1) : navigate(p)} />
       )}
     </div>
   );

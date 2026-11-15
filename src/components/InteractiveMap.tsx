@@ -1,9 +1,87 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import { teaRegionsData, teaShopsData } from "../data/teaData";
-import { TeaRegion, TeaShop, Page } from "../types";
+import { TeaRegion, TeaShop } from "../types";
 import { Icon } from "./Icon";
 
+function MapLayoutRefresh({ selectedRegionId }: { selectedRegionId: string }) {
+  const map = useMap();
+  useEffect(() => {
+    const refresh = () => map.invalidateSize({ pan: false });
+    const frame = requestAnimationFrame(refresh);
+    const observer = new ResizeObserver(refresh);
+    observer.observe(map.getContainer());
+    window.addEventListener("resize", refresh);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", refresh);
+    };
+  }, [map, selectedRegionId]);
+  return null;
+}
+
 export function InteractiveMap({
+  selectedRegionId,
+  onSelectedRegionChange,
+  onSelectRegion,
+  onSelectShop
+}: {
+  selectedRegionId: string;
+  onSelectedRegionChange: (regionId: string) => void;
+  onSelectRegion: (regionId: string) => void;
+  onSelectShop: (shopId: string) => void;
+}) {
+  const selected = teaRegionsData.find(region => region.id === selectedRegionId) ?? teaRegionsData[0];
+  const [tileError, setTileError] = useState(false);
+  const locationQuery = selected ? `${selected.name}, Thái Nguyên, Việt Nam` : "Thái Nguyên, Việt Nam";
+  const encoded = encodeURIComponent(locationQuery);
+  return <section className="map-section">
+    <div className="section-title">
+      <div className="eyebrow">Địa lý & Vùng nguyên liệu</div>
+      <h2 className="title">Bản đồ 4 vùng chè Thái Nguyên</h2>
+      <p>Chọn vùng chè để xem thông tin và mở chỉ đường trên Google Maps.</p>
+    </div>
+    <div className="map-container map-live-layout">
+      <div className="map-canvas-wrap map-live-canvas">
+        <div className="map-region-controls" role="group" aria-label="Chọn vùng chè">
+          {teaRegionsData.map(region =>
+            <button type="button" key={region.id} className={selected?.id === region.id ? "is-selected" : ""}
+              aria-pressed={selected?.id === region.id} onClick={() => onSelectedRegionChange(region.id)}>
+              {region.name.replace("Vùng chè ", "")}
+            </button>
+          )}
+        </div>
+        <MapContainer className="tea-region-leaflet" center={[21.58, 105.78] as [number, number]} zoom={11} scrollWheelZoom={false}>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            eventHandlers={{ tileerror: () => setTileError(true), tileload: () => setTileError(false) }}
+          />
+          <MapLayoutRefresh selectedRegionId={selectedRegionId} />
+        </MapContainer>
+        {tileError && <p className="map-tile-error" role="status">Không tải được một số ô bản đồ. Hãy kiểm tra kết nối mạng.</p>}
+        <p className="map-coordinate-note">Vị trí ghim riêng cho từng vùng chưa được xác minh; bản đồ hiển thị khu vực Thái Nguyên.</p>
+      </div>
+      <aside className="map-info-card" aria-live="polite">
+        {selected ? <>
+          <div className="eyebrow">Điểm đến: Vùng chè đặc sản</div>
+          <h3>{selected.name}</h3>
+          <strong className="map-region-tagline">{selected.tagline}</strong>
+          <div className="map-region-summary"><img src={selected.heroImage} alt={`Ảnh minh họa ${selected.name}`} loading="lazy"/><p>{selected.shortDesc}</p></div>
+          <div className="map-action-row">
+            <button type="button" className="btn btn-outline" onClick={() => onSelectRegion(selected.id)}>Xem chi tiết vùng chè</button>
+            <a className="btn btn-primary" href={`https://www.google.com/maps/dir/?api=1&destination=${encoded}`} target="_blank" rel="noreferrer">Chỉ đường</a>
+          </div>
+        </> : <p className="map-empty">Chọn một vùng chè để xem thông tin.</p>}
+      </aside>
+    </div>
+    <p className="place-note"><button className="btn btn-light" onClick={() => onSelectShop("")}>Cửa hàng & HTX</button></p>
+  </section>;
+}
+
+function LegacyIllustrativeMap({
   onSelectRegion,
   onSelectShop
 }: {
@@ -106,7 +184,7 @@ export function InteractiveMap({
             teaRegionsData.map((reg) => {
               const isSelected = activeItem.type === "region" && activeItem.data.id === reg.id;
               return (
-                <div
+                <button type="button" aria-label={reg.name}
                   key={reg.id}
                   className={`map-pin ${isSelected ? "active" : ""}`}
                   style={{ left: `${reg.mapCoords.xPercent}%`, top: `${reg.mapCoords.yPercent}%` }}
@@ -116,7 +194,7 @@ export function InteractiveMap({
                     <Icon name="leaf" size={17} />
                   </div>
                   <div className="map-pin-label">{reg.name}</div>
-                </div>
+                </button>
               );
             })}
 
@@ -125,7 +203,7 @@ export function InteractiveMap({
             teaShopsData.map((shop) => {
               const isSelected = activeItem.type === "shop" && activeItem.data.id === shop.id;
               return (
-                <div
+                <button type="button" aria-label={shop.name}
                   key={shop.id}
                   className={`map-pin shop ${isSelected ? "active" : ""}`}
                   style={{ left: `${shop.mapCoords.xPercent}%`, top: `${shop.mapCoords.yPercent}%` }}
@@ -135,11 +213,16 @@ export function InteractiveMap({
                     <Icon name="mapPin" size={17} />
                   </div>
                   <div className="map-pin-label">{shop.name}</div>
-                </div>
+                </button>
               );
             })}
         </div>
 
+        <div className="map-destination-list" aria-label="Danh sách điểm trên sơ đồ">
+          {teaRegionsData.map(reg => <button key={reg.id} aria-pressed={activeItem.type === "region" && activeItem.data.id === reg.id} onClick={() => setActiveItem({type:"region",data:reg})}>{reg.name}</button>)}
+          {filterMode !== "regions" && teaShopsData.map(shop => <button key={shop.id} aria-pressed={activeItem.type === "shop" && activeItem.data.id === shop.id} onClick={() => setActiveItem({type:"shop",data:shop})}>{shop.name}</button>)}
+          <small>Sơ đồ minh họa, không dùng để dẫn đường.</small>
+        </div>
         {/* Selected Info Card */}
         <div className="map-info-card">
           <div className="eyebrow" style={{ color: activeItem.type === "region" ? "var(--forest)" : "var(--brown)" }}>

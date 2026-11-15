@@ -1,4 +1,6 @@
-import { useState } from "react";
+import PurchaseDialog from "./PurchaseDialog";
+import ImageWithFallback from "./ImageWithFallback";
+import { useEffect, useRef, useState } from "react";
 import { Product } from "../types";
 import { Icon } from "./Icon";
 
@@ -10,40 +12,44 @@ export function ProductCard({
   onAdd,
   onBuyNow,
   isFavorite = false,
-  onToggleFavorite
+  onToggleFavorite,
+  detailsOnly = false
 }: {
   product: Product;
   onView: () => void;
-  onAdd: () => void;
-  onBuyNow?: () => void;
+  onAdd: () => void | Promise<unknown>;
+  onBuyNow?: (product?: Product, weight?: string, quantity?: number) => void;
   isFavorite?: boolean;
   onToggleFavorite?: (e: React.MouseEvent) => void;
+  detailsOnly?: boolean;
 }) {
+  const [choosing,setChoosing] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
-  const handleAdd = (e: React.MouseEvent) => {
+  const timer=useRef<ReturnType<typeof setTimeout>|null>(null),adding=useRef(false);
+  const [addError,setAddError]=useState("");
+  useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current)},[]);
+  const handleAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setJustAdded(true);
-    onAdd();
-    setTimeout(() => {
-      setJustAdded(false);
-    }, 1200);
+    if(product.stockQuantity===0||adding.current)return;
+    adding.current=true;setAddError("");
+    try {const result=await onAdd();if(result===false){setAddError("Chưa thêm được vào giỏ hàng.");return}setJustAdded(true);if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(()=>setJustAdded(false),1200)}
+    catch {setAddError("Chưa thêm được vào giỏ hàng. Vui lòng thử lại.")}
+    finally {adding.current=false}
+
   };
 
   const handleBuyNow = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onBuyNow) {
-      onBuyNow();
-    } else {
-      onAdd();
-    }
+    if(product.stockQuantity===0)return;
+    if (onBuyNow) setChoosing(true); else onView();
   };
 
   return (
     <article className="product-card">
       <div className="product-image">
         <button onClick={onView} aria-label={`Xem chi tiết ${product.name}`} style={{ width: "100%", height: "100%", border: 0, padding: 0, background: "transparent" }}>
-          {product.image ? <img src={product.image} alt={product.name} loading="lazy" /> : <span>Chưa có ảnh sản phẩm</span>}
+          {product.image ? <ImageWithFallback src={product.image} alt={product.name} loading="lazy" /> : <span>Chưa có ảnh sản phẩm</span>}
         </button>
         <span className="tag">{product.type}</span>
         {onToggleFavorite && <button
@@ -65,16 +71,17 @@ export function ProductCard({
         <button className="product-name" onClick={onView}>
           {product.name}
         </button>
-        <p>{product.note}</p>
+        {addError&&<p role="alert">{addError}</p>}<p>{product.note}</p>{product.stockQuantity!==undefined&&<small className="product-stock">{product.stockQuantity>0?`Còn ${product.stockQuantity} gói/hộp`:"Hết hàng"}</small>}
         <div className="product-bottom">
           <div className="product-price-info">
             <strong className="product-price-amount">{money(product.price)}</strong>
             <span className="product-weight-badge">{product.weight}</span>
           </div>
-          <div className="product-card-actions">
+          {detailsOnly ? <button type="button" className="product-details-link" onClick={onView}>Xem chi tiết</button> : <div className="product-card-actions">
             <button
               type="button"
               className="btn-card-buy"
+              disabled={product.stockQuantity===0}
               onClick={handleBuyNow}
               title={`Mua ngay ${product.name}`}
             >
@@ -83,6 +90,7 @@ export function ProductCard({
             </button>
             <button
               type="button"
+              disabled={product.stockQuantity===0}
               className={`btn-card-add ${justAdded ? "added" : ""}`}
               onClick={handleAdd}
               aria-label={justAdded ? "Đã thêm vào giỏ" : "Thêm vào giỏ"}
@@ -90,9 +98,10 @@ export function ProductCard({
             >
               <Icon name={justAdded ? "check" : "bag"} size={16} />
             </button>
-          </div>
+          </div>}
         </div>
       </div>
+      {choosing&&onBuyNow&&<PurchaseDialog product={product} onClose={()=>setChoosing(false)} onConfirm={(p,w,q)=>onBuyNow(p,w,q)}/>}
     </article>
   );
 }

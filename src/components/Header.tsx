@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { Page, Product, User } from "../types";
 import { Icon } from "./Icon";
 import { money } from "./ProductCard";
@@ -19,7 +19,8 @@ export function Header({
   products,
   onSelectProduct,
   currentUser,
-  onLogout
+  onLogout,
+  onOpenFavorites
 }: {
   page: Page;
   navigate: (p: Page) => void;
@@ -29,6 +30,7 @@ export function Header({
   onSelectProduct: (p: Product) => void;
   currentUser?: User | null;
   onLogout?: () => void;
+  onOpenFavorites?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -36,7 +38,14 @@ export function Header({
   const [showDropdown, setShowDropdown] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [badgeBump, setBadgeBump] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Header stays mounted while browser history changes the route. Keep the
+  // query, but close the stale results panel on the destination page.
+  useEffect(() => {
+    setShowDropdown(false);
+  }, [page]);
 
   // Trigger brief bounce animation on cart count changes
   useEffect(() => {
@@ -47,14 +56,26 @@ export function Header({
     }
   }, [cartCount]);
 
-  // Handle sticky header on scroll
-  useEffect(() => {
+  // Home overlays the hero without adding layout space. Other pages stay sticky.
+  useLayoutEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      const hero = page === "home"
+        ? document.querySelector(".hero")
+        : page === "tea-regions" && !new URLSearchParams(window.location.search).has("id")
+          ? document.querySelector(".region-video-hero")
+          : null;
+      setScrolled(hero
+        ? hero.getBoundingClientRect().bottom <= (headerRef.current?.offsetHeight ?? 76)
+        : window.scrollY > 20);
     };
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [page]);
 
   const cleanQuery = query.trim().toLowerCase();
   const normQuery = removeDiacritics(cleanQuery);
@@ -109,10 +130,7 @@ export function Header({
 
   return (
     <>
-      <div className="announcement">
-        Miễn phí giao hàng cho đơn từ 500.000₫ <span>•</span> Thu hái mới theo vụ <span>•</span> Trực tiếp từ nương chè Thái Nguyên
-      </div>
-      <header className={`header ${scrolled ? "scrolled" : ""}`}>
+      <header ref={headerRef} className={`header ${scrolled ? "scrolled" : ""} ${page === "home" || (page === "tea-regions" && !new URLSearchParams(window.location.search).has("id")) ? `header-home ${!scrolled ? "header-immersive" : ""}` : ""}`}>
         {/* Left: Mobile Hamburger */}
         <button
           className="mobile-menu"
@@ -176,7 +194,7 @@ export function Header({
               className={page === "ai" || page === "leaf" ? "active" : ""}
               onClick={() => go("ai")}
             >
-              AI Tư vấn
+              AI phân loại sâu bệnh lá chè
             </button>
           </div>
 
@@ -188,6 +206,7 @@ export function Header({
                   <strong>{currentUser.name}</strong>
                   <small>{currentUser.email}</small>
                 </div>
+                {currentUser.role === "USER" && currentUser.sellerEnabled && <button className="mobile-nav-item" onClick={() => go("seller")}>Kênh người bán</button>}
                 {currentUser.role === "ADMIN" && (
                   <button
                     className="mobile-nav-item admin-link"
@@ -294,7 +313,7 @@ export function Header({
                           onClick={() => handlePickProduct(item)}
                         >
                           <div className="search-col-image">
-                            <img src={item.image} alt={item.name} loading="lazy" />
+                            <img src={item.image || "/placeholder-teasmart.svg"} alt={item.name} loading="lazy" />
                           </div>
                           <div className="search-col-info">
                             <div className="search-item-title">{item.name}</div>
@@ -313,7 +332,7 @@ export function Header({
                         onClick={() => handlePickProduct(item)}
                       >
                         <div className="search-col-image">
-                          <img src={item.image} alt={item.name} loading="lazy" />
+                          <img src={item.image || "/placeholder-teasmart.svg"} alt={item.name} loading="lazy" />
                         </div>
                         <div className="search-col-info">
                           <div className="search-item-title">{item.name}</div>
@@ -353,12 +372,24 @@ export function Header({
           <button
             type="button"
             aria-label="Sản phẩm yêu thích"
-            onClick={() => go("account")}
+            onClick={() => onOpenFavorites ? onOpenFavorites() : go("account")}
             className="header-icon-btn"
             title="Sản phẩm yêu thích"
           >
             <Icon name="heart" size={20} />
             {wishlistCount > 0 && <span className="wishlist-count">{wishlistCount}</span>}
+          </button>
+
+          {/* Cart Icon: 🛒 */}
+          <button
+            type="button"
+            className={`cart-icon header-icon-btn ${badgeBump ? "badge-bump" : ""}`}
+            aria-label="Giỏ hàng"
+            onClick={() => go("cart")}
+            title="Giỏ hàng"
+          >
+            <Icon name="bag" size={20} />
+            {cartCount > 0 && <span>{cartCount}</span>}
           </button>
 
           {/* Account Icon: 👤 */}
@@ -379,20 +410,8 @@ export function Header({
             }}
             title={currentUser ? `Tài khoản: ${currentUser.name}` : "Đăng nhập / Đăng ký"}
           >
-            <Icon name="user" size={20} />
+            {currentUser?.avatarUrl ? <img src={currentUser.avatarUrl} alt="Ảnh đại diện" style={{width:28,height:28,borderRadius:"50%",objectFit:"cover"}} /> : <Icon name="user" size={20} />}
             {currentUser && <span className="user-logged-dot" />}
-          </button>
-
-          {/* Cart Icon: 🛒 */}
-          <button
-            type="button"
-            className={`cart-icon header-icon-btn ${badgeBump ? "badge-bump" : ""}`}
-            aria-label="Giỏ hàng"
-            onClick={() => go("cart")}
-            title="Giỏ hàng"
-          >
-            <Icon name="bag" size={20} />
-            {cartCount > 0 && <span>{cartCount}</span>}
           </button>
         </div>
       </header>
@@ -463,7 +482,7 @@ export function Header({
                           onClick={() => handlePickProduct(item)}
                         >
                           <div className="search-col-image">
-                            <img src={item.image} alt={item.name} loading="lazy" />
+                            <img src={item.image || "/placeholder-teasmart.svg"} alt={item.name} loading="lazy" />
                           </div>
                           <div className="search-col-info">
                             <div className="search-item-title">{item.name}</div>
@@ -482,7 +501,7 @@ export function Header({
                         onClick={() => handlePickProduct(item)}
                       >
                         <div className="search-col-image">
-                          <img src={item.image} alt={item.name} loading="lazy" />
+                          <img src={item.image || "/placeholder-teasmart.svg"} alt={item.name} loading="lazy" />
                         </div>
                         <div className="search-col-info">
                           <div className="search-item-title">{item.name}</div>

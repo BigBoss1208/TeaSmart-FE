@@ -1,0 +1,18 @@
+import {useEffect,useState} from "react";
+import {api,errorMessage,type ApiPage} from "../lib/commerce";
+import type {Product} from "../types";
+import ImageWithFallback from "./ImageWithFallback";
+import "./CustomerOrders.css";
+interface Review {reviewId:number;productId:number;rating:number;comment:string;status:string;createdAt:string;images?:{imageId:number;url:string}[]}
+const statusLabels:Record<string,string>={APPROVED:"Đã đăng",PENDING:"Chờ duyệt",HIDDEN:"Đã ẩn",DELETED:"Đã xóa"};
+export default function MyReviews({products}:{products:Product[]}) {
+ const [rows,setRows]=useState<Review[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true),[attempt,setAttempt]=useState(0);
+ const [query,setQuery]=useState(""),[status,setStatus]=useState("ALL"),[stars,setStars]=useState("ALL");
+ const visible=rows.filter(r=>(status==="ALL"||r.status===status)&&(stars==="ALL"||r.rating===Number(stars))&&(products.find(p=>p.id===r.productId)?.name??`Sản phẩm #${r.productId}`).toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi")));
+ useEffect(()=>{const a=new AbortController();setLoading(true);setError("");void api<ApiPage<Review>>("/reviews/my?size=50",{signal:a.signal}).then(r=>{if(!a.signal.aborted)setRows(r.content)}).catch(e=>{if(!a.signal.aborted)setError(errorMessage(e))}).finally(()=>{if(!a.signal.aborted)setLoading(false)});return()=>a.abort()},[attempt]);
+ return <section className="my-reviews"><header className="customer-panel-heading"><h1>Đánh giá của tôi</h1><p>Quản lý và theo dõi các đánh giá sản phẩm bạn đã thực hiện.</p></header>
+ <div className="purchase-tabs" aria-label="Lọc trạng thái đánh giá">{[["ALL","Tất cả"],["APPROVED","Đã đăng"],["PENDING","Chờ duyệt"],["HIDDEN","Đã ẩn"],["DELETED","Đã xóa"]].map(([value,label])=><button type="button" aria-pressed={status===value} key={value} onClick={()=>setStatus(value)}>{label}</button>)}</div>
+ <div className="customer-filter-bar"><input type="search" aria-label="Tìm đánh giá theo sản phẩm" placeholder="Tìm theo tên sản phẩm…" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Lọc số sao" value={stars} onChange={e=>setStars(e.target.value)}><option value="ALL">Tất cả mức đánh giá</option>{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} sao</option>)}</select></div>
+ {loading?<p role="status" className="customer-empty">Đang tải đánh giá…</p>:error?<div role="alert" className="customer-empty"><p>{error}</p><button type="button" className="btn btn-outline" onClick={()=>setAttempt(n=>n+1)}>Thử lại</button></div>:!rows.length?<p className="customer-empty">Bạn chưa có đánh giá sản phẩm nào.</p>:<><p>Hiển thị {rows.length} đánh giá trong trang dữ liệu đã tải.</p>{!visible.length&&<p className="customer-empty">Không có đánh giá phù hợp với bộ lọc.</p>}{visible.map(r=>{const product=products.find(p=>p.id===r.productId);return <article className="my-review-card" key={r.reviewId}><ImageWithFallback src={product?.image||"/placeholder-teasmart.svg"} alt={product?.name||`Sản phẩm #${r.productId}`}/><div><h3>{product?.name??`Sản phẩm #${r.productId}`}</h3>{product?.weight&&<small>{product.weight}</small>}<div className="my-review-stars" aria-label={`${r.rating} trên 5 sao`}>{"★".repeat(Math.max(0,Math.min(5,r.rating)))}{"☆".repeat(Math.max(0,5-r.rating))}</div><p>{r.comment}</p>{!!r.images?.length&&<div className="my-review-images">{r.images.map(image=><a key={image.imageId} href={image.url} target="_blank" rel="noreferrer"><ImageWithFallback src={image.url} alt="Ảnh đánh giá"/></a>)}</div>}</div><div className="my-review-meta"><span>{statusLabels[r.status]??r.status}</span><time dateTime={r.createdAt}>Đánh giá lúc: {r.createdAt.replace("T"," ")}</time></div></article>})}</>}
+ </section>;
+}

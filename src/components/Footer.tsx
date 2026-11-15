@@ -68,9 +68,6 @@ export function Footer({ navigate }: { navigate: (p: Page) => void }) {
 
       <div className="footer-bottom">
         <span>© 2025 - 2026 TeaSmart. Đồ án thương mại điện tử chuyên ngành CNTT.</span>
-        <button onClick={() => navigate("admin")} style={{ textDecoration: "underline", color: "var(--gold)" }}>
-          Cổng Quản trị Admin
-        </button>
         <div>
           <button onClick={() => navigate("policy")}>Bảo mật</button>
           <button onClick={() => navigate("policy")}>Điều khoản</button>

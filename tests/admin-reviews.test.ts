@@ -1,0 +1,22 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {loadReviews,searchReviews,reviewActions,type AdminReview} from "../src/lib/adminReviewView.ts";
+const fixture:AdminReview={reviewId:1,productName:null,authorName:null,rating:5,comment:null,status:"PENDING",createdAt:"2026-10-27T12:00:00"};
+test("Review loader retrieves all pages and forwards actual status/rating filters and abort",async()=>{const calls:URL[]=[],signal=new AbortController().signal;const rows=await loadReviews((async(path:string,init?:RequestInit)=>{assert.equal(init?.signal,signal);const url=new URL(path,"http://fixture");calls.push(url);return {content:[{...fixture,reviewId:calls.length}],totalPages:3}}) as any,signal,"HIDDEN","5");assert.equal(rows.length,3);assert.equal(calls[2].searchParams.get("page"),"2");assert(calls.every(x=>x.searchParams.get("rating")==="5"&&x.searchParams.get("status")==="HIDDEN"));});
+test("Review search is null-safe, trimmed and case insensitive across full data",()=>{const rows=Array.from({length:25},(_,i)=>({...fixture,reviewId:i,comment:i===24?"HƯƠNG CHÈ":null}));assert.equal(searchReviews(rows," hương chè ")[0].reviewId,24);assert.equal(searchReviews(rows,"").length,25);assert.equal(searchReviews(rows,"không có").length,0)});
+test("Only actual approve/hide transitions are exposed; deleted remains immutable",()=>{assert.deepEqual(reviewActions("PENDING"),{approve:true,hide:true});assert.deepEqual(reviewActions("HIDDEN"),{approve:true,hide:false});assert.deepEqual(reviewActions("APPROVED"),{approve:false,hide:true});assert.deepEqual(reviewActions("DELETED"),{approve:false,hide:false})});
+
+import {readFileSync} from "node:fs";
+import {createRequire} from "node:module";
+import ts from "typescript";
+import {reviewLabels} from "../src/lib/adminReviewView.ts";
+test("Review UI loads full KPIs, opens modal, confirms and blocks duplicate moderation",async()=>{
+ const require=createRequire(import.meta.url),slots:any[]=[],effects:(()=>void)[]=[];let cursor=0,writes=0,release:()=>void=()=>{};
+ const react={useState(x:any){const i=cursor++;if(!(i in slots))slots[i]=typeof x==="function"?x():x;return[slots[i],(v:any)=>slots[i]=typeof v==="function"?v(slots[i]):v]},useRef(x:any){const i=cursor++;return slots[i]??(slots[i]={current:x})},useEffect(fn:()=>void){const i=cursor++;if(!(i in slots)){slots[i]=true;effects.push(fn)}}};
+ const api=async(path:string,init:any={})=>{if(init.method){assert.equal(path,"/admin/reviews/1/approve");assert.equal(init.method,"PATCH");assert.equal(init.body,undefined);writes++;await new Promise<void>(r=>release=r);return {...fixture,status:"APPROVED"}}return {content:[fixture],totalPages:1}};
+ const module={exports:{} as any};const js=ts.transpileModule(readFileSync("src/pages/AdminReviews.tsx","utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+ new Function("require","module","exports",js)((name:string)=>name==="react"?react:name.endsWith(".css")?{}:name==="../components/Modal"||name==="../components/AdminPagination"?{default:()=>null}:name==="../lib/commerce"?{api,errorMessage:()=>"Lỗi API"}:name==="../lib/adminReviewView"?{loadReviews,searchReviews,reviewActions,reviewLabels}:require(name),module,module.exports);
+ const render=()=>{cursor=0;return module.exports.default()};const nodes=(x:any):any[]=>!x||typeof x!=="object"?[]:[x,...[x.props?.children].flat(Infinity).flatMap(nodes)];const text=(x:any):string=>typeof x==="string"?x:typeof x==="number"?String(x):!x?"":[x.props?.children].flat(Infinity).map(text).join("");const button=(label:string)=>nodes(render()).find(x=>x.type==="button"&&text(x)===label);const settle=()=>new Promise(r=>setImmediate(r));
+ const before=Object.getOwnPropertyDescriptor(globalThis,"window");Object.defineProperty(globalThis,"window",{configurable:true,value:{confirm:()=>true}});
+ try{assert.match(text(render()),/Đang tải/);effects.forEach(f=>f());await settle();assert.equal(nodes(render()).find(x=>x.props?.label==="đánh giá").props.total,1);button("Xem").props.onClick();assert(nodes(render()).some(x=>x.props?.title==="Chi tiết đánh giá"));button("Duyệt").props.onClick();await settle();button("Duyệt").props.onClick();assert.equal(writes,1);release();await settle();assert.match(text(render()),/Đã duyệt và hiển thị/)}finally{if(before)Object.defineProperty(globalThis,"window",before);else Reflect.deleteProperty(globalThis,"window")}
+});

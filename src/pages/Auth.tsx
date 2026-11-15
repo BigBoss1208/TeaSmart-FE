@@ -1,7 +1,9 @@
-import { api, errorMessage, mapUser, type ApiUser } from "../lib/commerce";
+import { api, ApiError, errorMessage, mapUser, type ApiUser } from "../lib/commerce";
 import { useState } from "react";
 import { User, Page } from "../types";
 import { Icon } from "../components/Icon";
+import { normalizeRegistrationPhone, registrationErrorMessage } from "../lib/registration";
+import GoogleLoginButton from "../components/GoogleLoginButton";
 
 export function LoginPage({
   onLogin,
@@ -18,17 +20,21 @@ export function LoginPage({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [forgotSent, setForgotSent] = useState(false);
 
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); if (busy) return; setError(""); setBusy(true);
+    e.preventDefault(); if (busy || googleBusy) return; setError(""); setBusy(true);
     try {
       const result = await api<{ accessToken: string; user: ApiUser }>("/auth/login", {
         method: "POST", body: JSON.stringify({ email: email.trim(), password }) });
       sessionStorage.setItem("teasmart_access_token", result.accessToken);
       onLogin(mapUser(result.user));
-    } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 401
+        ? "Tài khoản hoặc mật khẩu không chính xác."
+        : errorMessage(e));
+    } finally { setBusy(false); }
   };
 
   return (
@@ -72,27 +78,17 @@ export function LoginPage({
           </div>
         )}
 
-        {/* Forgot password notice */}
-        {forgotSent && (
-          <div className="auth-alert auth-alert-info">
-            <Icon name="spark" size={16} />
-            <span>
-              Liên kết khôi phục mật khẩu đã được gửi đến email của bạn (mô phỏng).
-            </span>
-          </div>
-        )}
-
         {/* Form */}
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-field">
-            <label htmlFor="login-email">Email đăng nhập</label>
+            <label htmlFor="login-email">Email hoặc số điện thoại</label>
             <div className="auth-input-wrap">
               <input
                 id="login-email"
-                type="email"
+                type="text"
                 required
-                autoComplete="email"
-                placeholder="ten@example.com"
+                autoComplete="username"
+                placeholder="Email hoặc số điện thoại"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -105,7 +101,7 @@ export function LoginPage({
               <button
                 type="button"
                 className="auth-link-subtle"
-                onClick={() => setError("Chức năng khôi phục mật khẩu chưa được triển khai.")}
+                onClick={() => navigate("forgot-password")}
               >
                 Quên mật khẩu?
               </button>
@@ -131,10 +127,16 @@ export function LoginPage({
             </div>
           </div>
 
-          <button type="submit" disabled={busy} className="btn btn-primary auth-submit-btn">
+          <button type="submit" disabled={busy || googleBusy} className="btn btn-primary auth-submit-btn">
             Đăng nhập <Icon name="arrow" size={15} />
           </button>
         </form>
+
+        <GoogleLoginButton disabled={busy} onBusyChange={setGoogleBusy} onAuthenticated={result => {
+          sessionStorage.setItem("teasmart_access_token", result.accessToken);
+          setError("");
+          onLogin(mapUser(result.user));
+        }} />
 
         {/* Switch to Register */}
         <div className="auth-footer-switch">
@@ -171,12 +173,17 @@ export function RegisterPage({
     if (password.length < 8 || new TextEncoder().encode(password).length > 72) {
       setError("Mật khẩu cần ít nhất 8 ký tự và tối đa 72 byte UTF-8."); return;
     }
+    const normalizedPhone = normalizeRegistrationPhone(phone);
+    if (!/^0[35789][0-9]{8}$/.test(normalizedPhone)) {
+      setError("Số điện thoại di động Việt Nam không hợp lệ. Vui lòng nhập dạng 0xxxxxxxxx hoặc +84xxxxxxxxx.");
+      return;
+    }
     setBusy(true);
     try {
       const user = await api<ApiUser>("/auth/register", { method: "POST", body: JSON.stringify({
-        fullName: name.trim(), email: email.trim(), phone: phone.trim().replace(/\s/g, ""), password }) });
+        fullName: name.trim(), email: email.trim(), phone: normalizedPhone, password }) });
       onRegisterSuccess(mapUser(user));
-    } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+    } catch (e) { setError(registrationErrorMessage(e)); } finally { setBusy(false); }
   };
 
   return (

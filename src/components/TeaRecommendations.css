@@ -1,0 +1,12 @@
+.tea-recommendations:not(.compact) .product-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.tea-recommendations:not(.compact) .product-grid>div{min-width:0;display:flex}
+.tea-recommendations:not(.compact) .product-card{width:100%;height:100%;display:flex;flex-direction:column;min-width:0}
+.tea-recommendations:not(.compact) .product-image{aspect-ratio:1/1;height:auto;min-height:0;flex:none;overflow:hidden}
+.tea-recommendations:not(.compact) .product-image img{width:100%;height:100%;object-fit:cover}
+.tea-recommendations:not(.compact) .product-info{flex:1;display:flex;flex-direction:column;min-width:0}
+.tea-recommendations:not(.compact) .product-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.8em;line-height:1.4}
+.tea-recommendations:not(.compact) .product-info>p:not([role=alert]){display:none}
+.tea-recommendations:not(.compact) .product-bottom{margin-top:auto;padding-top:14px}
+@media(max-width:1279px){.tea-recommendations:not(.compact) .product-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.tea-recommendations:not(.compact) .product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
+@media(max-width:420px){.tea-recommendations:not(.compact) .product-grid{grid-template-columns:1fr}}

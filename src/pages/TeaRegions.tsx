@@ -13,7 +13,8 @@ export function TeaRegionsList({
   onAddToCart,
   favorites,
   onToggleFavorite,
-  navigate
+  navigate,
+  showHero = true
 }: {
   onSelectRegion: (id: string) => void;
   onSelectProduct: (p: Product) => void;
@@ -21,11 +22,13 @@ export function TeaRegionsList({
   favorites: number[];
   onToggleFavorite: (id: number) => void;
   navigate: (p: Page) => void;
+  showHero?: boolean;
 }) {
+  const [selectedRegionId, setSelectedRegionId] = useState(teaRegionsData[0]?.id ?? "");
   return (
     <main className="page">
-      {/* Hero */}
-      <section className="explore-hero">
+      {/* Legacy hero is omitted when the current full-width video hero is rendered above. */}
+      {showHero && <section className="explore-hero">
         <div>
           <div className="eyebrow">Di sản văn hóa & Địa lý</div>
           <div className="page-title">
@@ -36,11 +39,11 @@ export function TeaRegionsList({
           </p>
         </div>
         <img src={teaRegionsData[0].heroImage} alt="Đồi chè Thái Nguyên" />
-      </section>
+      </section>}
 
       {/* Grid of Regions */}
       <ScrollReveal direction="up" delay={80}>
-        <section className="section">
+        <section className="section" id="legacy-region-list">
           <div className="section-title">
             <div className="eyebrow">Tứ đại danh trà</div>
             <div className="title">Bản sắc thổ nhưỡng từng vùng chè</div>
@@ -65,10 +68,11 @@ export function TeaRegionsList({
                   <button
                     className="btn btn-primary"
                     style={{ width: "100%", marginTop: "auto" }}
-                    onClick={() => onSelectRegion(reg.id)}
+                    onClick={() => setSelectedRegionId(reg.id)}
                   >
-                    Khám phá vùng chè <Icon name="arrow" size={16} />
+                    Chọn vùng này <Icon name="mapPin" size={16} />
                   </button>
+                  <button className="btn btn-outline" style={{width:"100%"}} onClick={() => onSelectRegion(reg.id)}>Xem chi tiết vùng chè <Icon name="arrow" size={16}/></button>
                 </div>
               </article>
             ))}
@@ -106,6 +110,8 @@ export function TeaRegionsList({
       {/* Interactive Map */}
       <ScrollReveal direction="up" delay={80}>
         <InteractiveMap
+          selectedRegionId={selectedRegionId}
+          onSelectedRegionChange={setSelectedRegionId}
           onSelectRegion={(id) => onSelectRegion(id)}
           onSelectShop={() => navigate("shops")}
         />
@@ -128,7 +134,7 @@ export function TeaRegionDetail({
   products: Product[];
   onSelectProduct: (p: Product) => void;
   onAddToCart: (p: Product) => void;
-  onBuyNow?: (p: Product) => void;
+  onBuyNow?: (p: Product, weight?: string, quantity?: number) => void;
   favorites: number[];
   onToggleFavorite: (id: number) => void;
   onBack: () => void;
@@ -272,7 +278,7 @@ export function TeaRegionDetail({
               product={prod}
               onView={() => onSelectProduct(prod)}
               onAdd={() => onAddToCart(prod)}
-              onBuyNow={onBuyNow ? () => onBuyNow(prod) : undefined}
+              onBuyNow={onBuyNow ? (selected,w,q) => onBuyNow(selected??prod,w,q) : undefined}
               isFavorite={favorites.includes(prod.id)}
               onToggleFavorite={() => onToggleFavorite(prod.id)}
             />

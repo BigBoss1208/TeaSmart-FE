@@ -1,0 +1,6 @@
+import type {ApiPage} from "./commerce";
+export interface AdminReview {reviewId:number;productName:string|null;authorName:string|null;rating:number;comment:string|null;status:string;createdAt:string}
+export const reviewLabels:Record<string,string>={PENDING:"Chờ duyệt",APPROVED:"Đang hiển thị",HIDDEN:"Đã ẩn",DELETED:"Đã xóa"};
+export const searchReviews=(rows:AdminReview[],query:string)=>{const term=query.trim().toLocaleLowerCase("vi");return rows.filter(r=>`${r.productName??""} ${r.authorName??""} ${r.comment??""}`.toLocaleLowerCase("vi").includes(term))};
+export async function loadReviews(transport:<T>(path:string,init?:RequestInit)=>Promise<T>,signal:AbortSignal,status="",rating=""){const params=new URLSearchParams({size:"50"});if(status)params.set("status",status);if(rating)params.set("rating",rating);const first=await transport<ApiPage<AdminReview>>(`/admin/reviews?${params}`,{signal});const rows=[...first.content];for(let page=1;page<first.totalPages;page++){params.set("page",String(page));rows.push(...(await transport<ApiPage<AdminReview>>(`/admin/reviews?${params}`,{signal})).content)}return rows}
+export const reviewActions=(status:string)=>({approve:status==="PENDING"||status==="HIDDEN",hide:status==="PENDING"||status==="APPROVED"});

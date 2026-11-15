@@ -1,0 +1,26 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {createRequire} from "node:module";
+import ts from "typescript";
+import {customerQuery} from "../src/lib/adminData.ts";
+test("Customer UI uses real server totals, opens modal and serializes confirmed status writes",async()=>{
+ const require=createRequire(import.meta.url),slots:any[]=[],effects:(()=>void)[]=[];let cursor=0,release:()=>void=()=>{},writes=0;
+ const user={userId:7,fullName:"Khách thử",email:"fixture@example.invalid",phone:null,status:"ACTIVE",createdAt:"2026-10-27T10:00:00",updatedAt:"2026-10-27T10:00:00",ordersCount:0,totalSpent:0};
+ const calls:string[]=[];
+ const api=async(path:string,init:any={})=>{calls.push(path);if(init.method){writes++;await new Promise<void>(r=>release=r);assert.deepEqual(JSON.parse(init.body),{status:"INACTIVE"});return {...user,status:"INACTIVE"}}return /customers\/7$/.test(path)?user:{content:[user],totalElements:25,totalPages:3,page:0}};
+ const react={useState(x:any){const i=cursor++;if(!(i in slots))slots[i]=typeof x==="function"?x():x;return[slots[i],(v:any)=>slots[i]=typeof v==="function"?v(slots[i]):v]},useRef(x:any){const i=cursor++;return slots[i]??(slots[i]={current:x})},useEffect(fn:()=>void){const i=cursor++;if(!(i in slots)){slots[i]=true;effects.push(fn)}}};
+ const module={exports:{} as any},code=ts.transpileModule(readFileSync("src/pages/AdminCustomers.tsx","utf8"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+ new Function("require","module","exports",code)((name:string)=>name==="react"?react:name.endsWith(".css")?{}:name==="../components/Modal"||name==="../components/AdminPagination"?{default:()=>null}:name==="../lib/commerce"?{api,errorMessage:()=>"Lỗi API"}:name==="../lib/adminData"?{customerQuery}:name==="../components/ProductCard"?{money:String}:require(name),module,module.exports);
+ const render=()=>{cursor=0;return module.exports.default()};
+ const nodes=(x:any):any[]=>!x||typeof x!=="object"?[]:[x,...[x.props?.children].flat(Infinity).flatMap(nodes)];
+ const text=(x:any):string=>typeof x==="string"?x:typeof x==="number"?String(x):!x?"":[x.props?.children].flat(Infinity).map(text).join("");
+ const button=(label:string)=>nodes(render()).find(x=>x.type==="button"&&text(x)===label);
+ const settle=()=>new Promise(r=>setImmediate(r));render();effects.forEach(f=>f());await settle();
+ assert(calls.includes("/admin/customers?page=0&size=1"));assert.match(text(render()),/25/);
+ const pager=nodes(render()).find(x=>x.props?.label==="khách hàng");assert.equal(pager.props.total,25);
+ await button("Chi tiết").props.onClick();assert(nodes(render()).some(x=>x.props?.title==="Chi tiết khách hàng"));
+ button("Khóa tài khoản").props.onClick();const first=button("Xác nhận thay đổi").props.onClick();await settle();
+ await button("Đang cập nhật…").props.onClick();assert.equal(writes,1);release();await first;await settle();assert.match(text(render()),/Đã cập nhật trạng thái tài khoản/);assert(button("Mở khóa tài khoản"));
+ assert(!calls.some(x=>/delete|reconcile/.test(x)));
+});

@@ -73,3 +73,16 @@ test("order adapter uses server IDs, amounts and independent payment status", ()
     paymentMethod: "COD", paymentStatus: "PENDING", items: [] });
   assert.equal(result.backendId, 7); assert.equal(result.total, 999); assert.equal(result.status, "Đã giao"); assert.equal(result.paymentStatus, "PENDING");
 });
+
+
+test("late 401 from previous account cannot clear new account session", async () => {
+  storage.set("teasmart_access_token", "old-offline-session");
+  let release!: (response: Response) => void;
+  globalThis.fetch = () => new Promise(resolve => { release = resolve; });
+  const request = api("/cart");
+  storage.set("teasmart_access_token", "new-offline-session");
+  release(new Response(JSON.stringify({ code: "UNAUTHORIZED", message: "Unauthorized" }), { status: 401 }));
+  await assert.rejects(request, e => e instanceof ApiError && e.status === 401);
+  assert.equal(storage.get("teasmart_access_token"), "new-offline-session");
+  storage.clear();
+});

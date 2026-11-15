@@ -20,11 +20,15 @@ export function TeaShopsList({
   onToggleFavorite: (id: number) => void;
 }) {
   const [filterRegion, setFilterRegion] = useState("all");
+  const [query, setQuery] = useState("");
 
-  const visibleShops =
+  const regionShops =
     filterRegion === "all"
       ? teaShopsData
       : teaShopsData.filter((s) => s.regionId === filterRegion);
+  const visibleShops = regionShops.filter((shop) =>
+    `${shop.name} ${shop.brandTitle} ${shop.regionName} ${shop.address}`.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))
+  );
 
   return (
     <main className="page">
@@ -35,7 +39,7 @@ export function TeaShopsList({
             Cửa hàng & Thương hiệu<br />chè Thái Nguyên
           </div>
           <p>
-            Giới thiệu những hợp tác xã và thương hiệu chè tiêu biểu gìn giữ văn hóa làng nghề truyền thống, đạt chứng nhận OCOP 4 - 5 sao và tiêu chuẩn VietGAP.
+            Khám phá các hồ sơ giới thiệu cửa hàng và hợp tác xã chè Thái Nguyên trong danh mục cũ.
           </p>
         </div>
         <img src={teaShopsData[0].coverImage} alt="HTX chè Thái Nguyên" />
@@ -44,7 +48,10 @@ export function TeaShopsList({
       <section className="section">
         {/* Filter bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "35px", flexWrap: "wrap", gap: "15px" }}>
-          <div>
+          <div style={{ width: "100%" }}>
+            <label style={{ display: "grid", gap: 8, maxWidth: 520, marginBottom: 16 }}>Tìm cửa hàng / HTX
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nhập tên, vùng hoặc địa chỉ" style={{ width: "100%", padding: 12, border: "1px solid #bdcbbd", borderRadius: 6 }} />
+            </label>
             <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--brown)", fontWeight: 700, marginRight: "15px" }}>
               Lọc theo vùng nguyên liệu:
             </span>
@@ -111,6 +118,7 @@ export function TeaShopsList({
               </article>
             ))}
           </div>
+          {visibleShops.length === 0 && <p role="status">Không tìm thấy cửa hàng hoặc HTX phù hợp.</p>}
         </ScrollReveal>
 
         {/* Video Documentary Section in Shops */}
@@ -158,7 +166,7 @@ export function TeaShopDetail({
   products: Product[];
   onSelectProduct: (p: Product) => void;
   onAddToCart: (p: Product) => void;
-  onBuyNow?: (p: Product) => void;
+  onBuyNow?: (p: Product, weight?: string, quantity?: number) => void;
   favorites: number[];
   onToggleFavorite: (id: number) => void;
   onBack: () => void;
@@ -250,7 +258,7 @@ export function TeaShopDetail({
               product={prod}
               onView={() => onSelectProduct(prod)}
               onAdd={() => onAddToCart(prod)}
-              onBuyNow={onBuyNow ? () => onBuyNow(prod) : undefined}
+              onBuyNow={onBuyNow ? (selected,w,q) => onBuyNow(selected??prod,w,q) : undefined}
               isFavorite={favorites.includes(prod.id)}
               onToggleFavorite={() => onToggleFavorite(prod.id)}
             />

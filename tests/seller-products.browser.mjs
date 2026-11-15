@@ -1,0 +1,52 @@
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+import { createServer } from "vite";
+import { mkdir } from "node:fs/promises";
+const { SELLER_TEST_SCHEMA:schema, SELLER_TEST_PORT:port, SELLER_TEST_TOKEN:token }=process.env;
+assert.match(schema??"",/^teasmart_seller_test_[0-9a-f]{32}$/);
+assert.ok(Number(port)>0 && port!=="8080" && token);
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:"playwright");
+const server=await createServer({server:{watch:{ignored:["**/artifacts/**","**/backend/target/**"]},host:"127.0.0.1",port:3108,strictPort:true,proxy:{"/api":{target:"http://127.0.0.1:"+port,changeOrigin:true}}}});
+await server.listen();
+const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE});
+try {
+  const page=await browser.newPage({viewport:{width:1366,height:900}});
+  await page.route("**/*",route=>new URL(route.request().url()).origin==="http://127.0.0.1:3108"?route.continue():route.abort());
+  await page.addInitScript(t=>sessionStorage.setItem("teasmart_access_token",t),token);
+  await page.goto("http://127.0.0.1:3108/seller",{waitUntil:"domcontentloaded",timeout:60000});
+  await page.getByRole("heading",{name:"Chào mừng đến Kênh người bán"}).waitFor();
+  await mkdir("artifacts/seller-ui/center",{recursive:true});
+  for(const width of [375,390,768,1366,1920]){
+    await page.setViewportSize({width,height:900});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Center overflow at ${width}`);
+    await page.screenshot({path:`artifacts/seller-ui/center/${width}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:1366,height:900});
+  const panel=page.locator(".seller-products");
+  await page.getByRole("navigation",{name:"Quản lý gian hàng"}).getByRole("button",{name:"Sản phẩm",exact:true}).click();
+  await panel.getByRole("button",{name:"Thêm sản phẩm"}).click();
+  await panel.getByLabel("Tên sản phẩm").fill("Trà dành cho kiểm thử giao diện");
+  await panel.getByLabel("Danh mục").selectOption({index:1});
+  await panel.getByLabel("Vùng chè").selectOption({index:1});
+  await panel.getByLabel("Giá (đồng)").fill("120000");
+  await panel.getByLabel("Khối lượng (g)").fill("100");
+  await panel.getByRole("button",{name:"Lưu",exact:true}).click();
+  const row=panel.getByRole("row").filter({hasText:"Trà dành cho kiểm thử giao diện"});
+  await row.getByRole("button",{name:"Điều chỉnh kho"}).click();
+  await panel.getByLabel("Số lượng tăng").fill("12");
+  await panel.getByLabel("Lý do").fill("Nhập chè đầu vụ");
+  await panel.getByRole("button",{name:"Lưu",exact:true}).click();
+  await row.getByRole("button",{name:"Sẵn sàng bán"}).click();
+  await row.getByRole("button",{name:"Ngừng bán"}).waitFor();
+  await mkdir("artifacts/seller-products",{recursive:true});
+  await page.screenshot({path:"artifacts/seller-products/desktop.png",fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.screenshot({path:"artifacts/seller-products/mobile.png",fullPage:true});
+  await row.getByRole("button",{name:"Sửa",exact:true}).click();
+  await panel.getByLabel("Tên sản phẩm").fill("Trà kiểm thử đã sửa");
+  await panel.getByRole("button",{name:"Lưu",exact:true}).click();
+  await panel.getByLabel("Tìm sản phẩm").fill("Trà kiểm thử đã sửa");
+  await panel.getByText("Trà kiểm thử đã sửa",{exact:true}).waitFor();
+  console.log("Seller desktop/mobile browser using real synthetic DB/API PASS");
+}finally{await browser.close();await server.close();}

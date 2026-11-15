@@ -26,3 +26,5 @@ export function customerQuery(keyword: string, status: string, page: number): st
 export function chartHeight(amount: number, max: number): number {
   return max > 0 ? Math.max(0, Math.min(150, amount / max * 150)) : 0;
 }
+
+export interface SellerDashboardData extends DashboardData { shopId:number;shopName:string;totalOrderValue:number;unpaidOrderValue:number;itemsSold:number;topProducts:{productId:number;name:string;quantity:number;orderValue:number}[] }

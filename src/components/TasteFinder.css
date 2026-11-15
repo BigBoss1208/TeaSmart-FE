@@ -1,0 +1,27 @@
+.taste-finder-v2 { grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); gap: 48px; }
+.taste-finder-v2 .taste-copy, .taste-finder-v2 .taste-panel { min-width: 0; }
+.taste-finder-v2 .taste-title { margin: 0; font-weight: 500; }
+.taste-finder-v2 .taste-honesty { display: block; max-width: 340px; margin-top: 16px; color: var(--muted); line-height: 1.7; }
+.taste-finder-v2 .taste-panel { border: 1px solid var(--line); border-radius: 16px; padding: 26px; }
+.taste-finder-v2 .taste-options { padding-bottom: 22px; }
+.taste-finder-v2 .taste-options button { border-radius: 8px; font: inherit; font-size: 12px; padding: 8px; }
+.taste-finder-v2 .taste-options button:focus-visible, .taste-finder-v2 button:focus-visible { outline: 2px solid var(--forest); outline-offset: 3px; }
+.taste-finder-v2 .taste-results-heading { margin: 22px 0 18px; }
+.taste-finder-v2 .taste-results-heading h3 { margin: 0 0 5px; color: var(--forest); font-size: 20px; }
+.taste-finder-v2 .taste-results-heading span, .taste-finder-v2 .taste-result-note { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.taste-finder-v2 .taste-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.taste-finder-v2 .product-card { border: 1px solid var(--line); background: var(--paper); border-radius: 10px; overflow: hidden; }
+.taste-finder-v2 .product-image { height: auto; aspect-ratio: 1; }
+.taste-finder-v2 .product-image img { object-fit: contain; }
+.taste-finder-v2 .product-image .tag { max-width: calc(100% - 24px); font-size: 8px; letter-spacing: .04em; }
+.taste-finder-v2 .product-info { padding: 15px; }
+.taste-finder-v2 .product-name { font-size: 14px; line-height: 1.5; min-height: 42px; }
+.taste-finder-v2 .product-info > p { display: none; }
+.taste-finder-v2 .product-bottom { flex-wrap: wrap; gap: 12px; }
+.taste-finder-v2 .product-details-link { padding: 8px 0; border: 0; background: transparent; color: var(--forest); font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.taste-finder-v2 .taste-state { min-height: 230px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 28px 18px; background: var(--cream); border-radius: 10px; color: var(--forest); }
+.taste-finder-v2 .taste-state h4 { margin: 14px 0 0; font-size: 17px; }
+.taste-finder-v2 .taste-state p { max-width: 390px; margin: 12px 0; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.taste-finder-v2 .taste-result-note { margin: 16px 0 0; }
+@media (max-width: 1000px) { .taste-finder-v2 { grid-template-columns: minmax(0, 1fr); gap: 28px; } .taste-finder-v2 .taste-copy > p { max-width: 580px; } }
+@media (max-width: 520px) { .taste-finder-v2 { padding: 52px 16px; } .taste-finder-v2 .taste-panel { padding: 16px; } .taste-finder-v2 .taste-cards { grid-template-columns: minmax(0, 1fr); } .taste-finder-v2 .taste-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } .taste-finder-v2 .product-image { aspect-ratio: 1.25; } }

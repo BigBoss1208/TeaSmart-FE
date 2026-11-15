@@ -21,3 +21,19 @@ logs/
 /.opencode-skills/
 
 __pycache__/
+
+# Generated local test/build output
+/backend/target/
+/ai-service/.venv/
+/.pytest_cache/
+/.wrangler/
+/.playwright-mcp/
+/artifacts/codex-frontend-build/
+
+# Local sibling services and diagnostic outputs
+/backend/
+/ai-service/
+/artifacts/
+*.sql
+*.dump
+*.backup
