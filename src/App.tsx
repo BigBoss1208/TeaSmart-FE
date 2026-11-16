@@ -1524,7 +1524,7 @@ export default function App() {
       {page === "policy" && <PolicyPage />}
       </div>
 
-      <ChatbotWidget key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} onLogin={() => navigate("login")} onProduct={handleSelectChatProduct} openSignal={chatOpenSignal} />
+      <ChatbotWidget productId={page === "product" ? currentProduct?.id : undefined} key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} onLogin={() => navigate("login")} onProduct={handleSelectChatProduct} openSignal={chatOpenSignal} />
       {!["checkout", "admin"].includes(page) && (
         <Footer navigate={navigate} />
       )}

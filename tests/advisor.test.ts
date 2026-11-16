@@ -33,6 +33,19 @@ test("advisor contract, budget validation, authentication and truthful UI states
       const answer = await helpers.requestTeaAdvice(" ít chát ", { maxPrice: 200000 }, { regionId: 3 }, new AbortController().signal);
       assert.equal(answer.recommendations.items.length, 0);
     });
+    await t.test("RAG client sends current product context and clears it outside product pages", async () => {
+      const rag = await server.ssrLoadModule("/src/lib/ragChat.ts");
+      const bodies: Array<Record<string, unknown>> = [];
+      globalThis.fetch = async (_path, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ method: "READ_ONLY_BUSINESS_V1", reply: "Thông tin sản phẩm", preferences: {}, notices: [], recommendations: { items: [] }, llmUsed: false, sources: [] }), { status: 200 });
+      };
+      for (const productId of [11, 22, undefined]) {
+        await rag.requestRagAdvice("Giá bao nhiêu?", {}, undefined, [], new AbortController().signal, false, productId);
+      }
+      assert.deepEqual(bodies.map(body => body.productId), [11, 22, undefined]);
+      assert.equal(Object.hasOwn(bodies[2], "productId"), false);
+    });
     await t.test("locked account 401 clears old token, no fabricated fallback", async () => {
       globalThis.fetch = async () => new Response(JSON.stringify({ code: "UNAUTHORIZED", message: "Authentication required" }), { status: 401 });
       await assert.rejects(helpers.requestTeaAdvice("chè", {}, undefined, new AbortController().signal), (e: { status: number }) => e.status === 401);

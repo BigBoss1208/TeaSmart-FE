@@ -7,7 +7,7 @@ import { requestRagAdvice, chatErrorMessage, type RagAdvice } from "../lib/ragCh
 import type { Product } from "../types";
 import "./ChatbotWidget.css";
 type Message = { text: string; at: string; answer?: RagAdvice; failed?: boolean };
-export default function ChatbotWidget({customer,onLogin,onProduct,openSignal=0}:{customer:boolean;onLogin:()=>void;onProduct:(p:Product)=>void;openSignal?:number}) {
+export default function ChatbotWidget({customer,onLogin,onProduct,openSignal=0,productId}:{customer:boolean;onLogin:()=>void;onProduct:(p:Product)=>void;openSignal?:number;productId?:number}) {
  const [open,setOpen]=useState(false),[text,setText]=useState(""),[messages,setMessages]=useState<Message[]>([]),[busy,setBusy]=useState(false);
  const abort=useRef<AbortController|null>(null),flight=useRef(false),end=useRef<HTMLDivElement>(null),context=useRef<RagAdvice["preferences"]|undefined>(undefined);
  const [allowLlm,setAllowLlm]=useState(false);
@@ -15,11 +15,11 @@ export default function ChatbotWidget({customer,onLogin,onProduct,openSignal=0}:
  useEffect(()=>{if(openSignal)setOpen(true)},[openSignal]);
  useEffect(()=>{end.current?.scrollIntoView?.({block:"end",behavior:"smooth"})},[messages,busy,open]);
  useEffect(()=>()=>abort.current?.abort(),[]);
- useEffect(()=>{abort.current?.abort();flight.current=false;setBusy(false);setMessages([]);context.current=undefined;setImages({});},[customer]);
+ useEffect(()=>{abort.current?.abort();flight.current=false;setBusy(false);setMessages([]);context.current=undefined;setImages({});setText("");},[customer,productId]);
  function close(){abort.current?.abort();flight.current=false;setBusy(false);setOpen(false)}
  async function send(value=text){if(flight.current||!customer||!value.trim())return;if(validateTeaForm(value,"","")){setMessages(m=>[...m,{text:"Vui lòng nhập câu hỏi hợp lệ; không gửi token hoặc thông tin đăng nhập.",at:"",failed:true}]);return;}flight.current=true;setBusy(true);setText("");const controller=new AbortController();abort.current=controller;
  const at=new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"});setMessages(m=>[...m,{text:value.trim(),at}].slice(-16));
- try{const answer=await requestRagAdvice(value,{},context.current,messages.filter(m=>!m.answer&&!m.failed).map(m=>m.text),controller.signal,allowLlm);if(controller.signal.aborted)return;context.current=answer.preferences;setMessages(m=>[...m,{text:answer.reply,at:new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}),answer}].slice(-16));
+ try{const answer=await requestRagAdvice(value,{},context.current,messages.filter(m=>!m.answer&&!m.failed).map(m=>m.text),controller.signal,allowLlm,productId);if(controller.signal.aborted)return;context.current=answer.preferences;setMessages(m=>[...m,{text:answer.reply,at:new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}),answer}].slice(-16));
  for(const item of answer.businessProducts??[]){try{const p=await api<ApiProduct>(`/products/${encodeURIComponent(item.slug)}`,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(5000)])});if(!controller.signal.aborted&&p.imageUrl)setImages(x=>({...x,[item.slug]:p.imageUrl!}));}catch{}}
  }catch(e){if(!controller.signal.aborted){const error=chatErrorMessage(e);setMessages(m=>[...m,{text:error,at,failed:true}]);setText(value);}}finally{if(!controller.signal.aborted){flight.current=false;setBusy(false)}}
  }
