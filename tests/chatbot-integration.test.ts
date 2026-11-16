@@ -4,13 +4,15 @@ import { readFileSync } from "node:fs";
 import { chatErrorMessage, requestRagAdvice } from "../src/lib/ragChat.ts";
 import { ApiError } from "../src/lib/commerce.ts";
 
-test("AI and leaf routes render separate components with customer identity", () => {
+test("Classifier renders leaf analysis and advice uses the customer widget", () => {
  const app = readFileSync("src/App.tsx", "utf8");
- assert.match(app, /page === "ai" && <TeaAdvisor/);
+ assert.doesNotMatch(app, /page === "ai" && <TeaAdvisor/);
  assert.match(app, /page === "leaf" && <LeafAnalysis/);
- assert.doesNotMatch(app, /\(page === "ai" \|\| page === "leaf"\)/);
- assert.match(app, /<TeaAdvisor[^>]*customer=\{currentUser\?\.role === "USER"\}/);
+ assert.ok(app.includes('if (p === "ai") { setChatOpenSignal'));
+ assert.match(app, /<ChatbotWidget[^>]*customer=\{currentUser\?\.role === "USER"\}/);
+ assert.ok(readFileSync("src/components/Header.tsx", "utf8").includes('go("leaf")'));
 });
+
 test("Knowledge unavailable, auth, timeout and network errors are actionable and honest", () => {
  for (const code of ["RAG_DISABLED", "RAG_NOT_CONFIGURED"]) assert.match(chatErrorMessage(new ApiError(503, code, "private provider detail")), /chưa được cấu hình/);
  assert.match(chatErrorMessage(new ApiError(503, "RAG_LLM_DISABLED", "")), /chọn chế độ/);

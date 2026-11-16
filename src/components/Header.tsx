@@ -191,8 +191,8 @@ export function Header({
               Câu chuyện TeaSmart
             </button>
             <button
-              className={page === "ai" || page === "leaf" ? "active" : ""}
-              onClick={() => go("ai")}
+              className={page === "leaf" ? "active" : ""}
+              onClick={() => go("leaf")}
             >
               AI phân loại sâu bệnh lá chè
             </button>

@@ -15,7 +15,6 @@ import CustomerOrders from "./components/CustomerOrders";
 import "./pages/ManualFeedback.css";
 import ChatbotWidget from "./components/ChatbotWidget";
 import LeafAnalysis from "./pages/LeafAnalysis";
-import TeaAdvisor from "./pages/TeaAdvisor";
 import TeaRecommendations from "./components/TeaRecommendations";
 import TasteFinder from "./components/TasteFinder";
 import PaymentCheckout from "./pages/PaymentCheckout";
@@ -988,7 +987,7 @@ function getInitialRoute(): { page: Page; adminSubView: AdminSubView } {
     return { page: "checkout", adminSubView: "Dashboard" };
   }
   if (path === "/ai-tu-van" || path === "/ai") {
-    return { page: "ai", adminSubView: "Dashboard" };
+    return { page: "leaf", adminSubView: "Dashboard" };
   }
   if (path === "/nhan-dien-la" || path === "/leaf") {
     return { page: "leaf", adminSubView: "Dashboard" };
@@ -1036,7 +1035,7 @@ function getPathForPage(p: Page, adminSubView?: AdminSubView): string {
     case "checkout":
       return "/checkout";
     case "ai":
-      return "/ai";
+      return "/leaf";
     case "leaf":
       return "/leaf";
     case "seller":
@@ -1125,6 +1124,7 @@ export default function App() {
   };
   const directPurchase = buyNow?.owner === String(currentUser?.id) ? buyNow : null;
   const navigate = (p: Page, subView?: AdminSubView) => {
+    if (p === "ai") { setChatOpenSignal(n => n + 1); return; }
     if (p === "checkout") sessionStorage.removeItem(checkoutReceiptKey);
     if (p !== "checkout") { setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again"); }
     if (p === "cart") { setBuyNow(null); sessionStorage.removeItem("teasmart_buy_now"); }
@@ -1502,7 +1502,6 @@ export default function App() {
         <PaymentCheckout selectedItems={directPurchase||buyAgain?.owner===String(currentUser?.id)?undefined:selectedDraft?.items} buyNow={directPurchase ? { productId: directPurchase.product.id, quantity: directPurchase.qty, intentId: directPurchase.intentId ?? "legacy" } : undefined} buyAgain={buyAgain?.owner===String(currentUser?.id)?buyAgain.items:undefined} openOrder={openOrder} openOrders={openOrders} key={String(currentUser?.id)} products={products} cart={buyAgain?.owner===String(currentUser?.id)?buyAgain.items.map(item=>({product:item.product,qty:item.quantity})):directPurchase ? [directPurchase] : (selectedDraft?cart.filter(x=>selectedDraft.items.some(i=>x.cartItemId===i.cartItemId)):cart).map(x=>({...x,product:{...x.product,weight:products.find(p=>p.id===x.product.id)?.weight??x.product.weight}}))} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
       )}
 
-      {page === "ai" && <TeaAdvisor key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} navigate={navigate} onAddToCart={addToCart} onSelectProduct={handleSelectChatProduct} />}
       {page === "leaf" && <LeafAnalysis />}
 
       {page === "seller" && (authState === "loading" ? <main className="page"><p role="status">Đang xác minh phiên đăng nhập…</p></main> : authState === "error" ? <main className="page"><p role="alert">Không thể xác minh phiên đăng nhập.</p><button className="btn btn-outline" onClick={() => setAuthRetry(n => n + 1)}>Thử lại</button></main> : <SellerCenter key={String(currentUser?.id ?? "guest")} user={authState === "guest" ? null : currentUser} onLogin={() => { sessionStorage.setItem("teasmart_seller_return", "/seller"); navigate("login"); }} onShopping={() => navigate("home")} />)}
