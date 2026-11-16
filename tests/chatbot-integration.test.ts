@@ -15,7 +15,7 @@ test("Classifier renders leaf analysis and advice uses the customer widget", () 
 
 test("Knowledge unavailable, auth, timeout and network errors are actionable and honest", () => {
  for (const code of ["RAG_DISABLED", "RAG_NOT_CONFIGURED"]) assert.match(chatErrorMessage(new ApiError(503, code, "private provider detail")), /chưa được cấu hình/);
- assert.match(chatErrorMessage(new ApiError(503, "RAG_LLM_DISABLED", "")), /chọn chế độ/);
+ assert.match(chatErrorMessage(new ApiError(503, "RAG_LLM_DISABLED", "")), /chưa thể trả lời/);
  assert.match(chatErrorMessage(new ApiError(401, "", "")), /đăng nhập/);
  assert.match(chatErrorMessage(new ApiError(403, "", "")), /khách hàng/);
  assert.match(chatErrorMessage(new ApiError(504, "RAG_TIMEOUT", "")), /thử lại/);

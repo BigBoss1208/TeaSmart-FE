@@ -14,8 +14,8 @@ export function chatErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return "Kết nối bị gián đoạn. Hãy kiểm tra mạng và thử lại.";
   if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
   if (error.status === 403) return "Chức năng tư vấn dành cho tài khoản khách hàng.";
-  if (["RAG_DISABLED", "RAG_NOT_CONFIGURED"].includes(error.code ?? "")) return "Tư vấn kiến thức RAG/LLM chưa được cấu hình. Bạn vẫn có thể hỏi sản phẩm, ngân sách, khẩu vị và tồn kho từ danh mục TeaSmart.";
-  if (error.code === "RAG_LLM_DISABLED") return "Câu hỏi này cần tư vấn kiến thức. Hãy chọn chế độ kiến thức RAG/LLM nếu muốn gửi câu hỏi tới provider đã cấu hình. Chế độ danh mục chỉ dùng quy tắc và dữ liệu cửa hàng.";
+  if (["RAG_DISABLED", "RAG_NOT_CONFIGURED"].includes(error.code ?? "")) return "Tư vấn kiến thức chưa được cấu hình. Bạn vẫn có thể hỏi sản phẩm, ngân sách, khẩu vị và tồn kho từ danh mục TeaSmart.";
+  if (error.code === "RAG_LLM_DISABLED") return "Mình chưa thể trả lời câu hỏi kiến thức này lúc này. Bạn vẫn có thể hỏi về sản phẩm hoặc cách mua hàng.";
   if (error.status === 504 || error.code === "RAG_TIMEOUT") return "Tư vấn mất quá nhiều thời gian. Bạn có thể thử lại.";
   if (error.status >= 500) return "Dịch vụ tư vấn kiến thức hiện không sẵn sàng. Hãy thử lại sau; tư vấn sản phẩm vẫn dùng dữ liệu cửa hàng.";
   return "Không thể xử lý yêu cầu. Hãy kiểm tra câu hỏi và bộ lọc rồi thử lại.";
