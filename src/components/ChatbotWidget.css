@@ -5,3 +5,9 @@
 .tea-chat-messages{overflow-x:hidden;font-size:13px}.tea-chat-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}.tea-chat-products article{min-width:0;width:auto}.tea-chat-products img{width:100%;object-fit:contain}.tea-chat-products strong,.tea-chat-products small{overflow-wrap:anywhere}.tea-chat-prompts{flex-shrink:0;max-width:100%;box-sizing:border-box}.tea-chat-messages>div{max-width:100%}
 
 .tea-chat-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0 12px}.tea-chat-pagination button{border:1px solid #bcd1c4;border-radius:8px;padding:7px 10px;color:#07513c;background:white}
+
+/* Keep scrolling local and associate each product grid with its answer. */
+.tea-chat-messages{overscroll-behavior:contain;overflow-anchor:none}
+.tea-chat-ai>div{flex:1}
+.tea-chat-prompts{scrollbar-width:none}
+.tea-chat-prompts::-webkit-scrollbar{display:none}

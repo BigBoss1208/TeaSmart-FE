@@ -43,7 +43,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     assert.equal(await input.inputValue(),'câu tiếp theo đang soạn');
     assert.equal(calls.length,1); assert.equal(Object.hasOwn(calls[0],'allowLlm'),false);
     console.log('PASS accepted send clears input, late response preserves new draft, double submit blocked');
-    assert.equal(await page.locator('.tea-chat-products article').count(),4);
+    assert.equal(await page.locator('[data-chat-message].tea-chat-ai').last().locator('.tea-chat-products article').count(),4);
     const requestCount=calls.length, messageCount=await page.locator('.tea-chat-user').count();
     await page.getByRole('button',{name:'Xem thêm sản phẩm',exact:true}).click();
     assert.equal(await page.locator('.tea-chat-products article').count(),8);
@@ -63,7 +63,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     for(const width of [1440,390]) {
       await page.setViewportSize({width,height:900});
       assert(await page.locator('.tea-chat-window').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
-      assert(await page.locator('.tea-chat-products').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
+      assert(await page.locator('.tea-chat-products').evaluateAll(grids=>grids.every(e=>e.scrollWidth<=e.clientWidth+1)));
     }
     console.log('PASS desktop/mobile cards fit widget');
     await page.getByRole('button',{name:'Làm mới hội thoại',exact:true}).click();
@@ -91,7 +91,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       assert(await page.locator('.tea-chat-window [role="alert"]').count()>0);
     }
     knowledgeMode='business';await input.fill('Chè dưới 300k');await submit.click();await idle();
-    assert.equal(await page.locator('.tea-chat-products article').count(),4);
+    assert.equal(await page.locator('[data-chat-message].tea-chat-ai').last().locator('.tea-chat-products article').count(),4);
     console.log('PASS mock knowledge with/without evidence, safe 503/504, no automatic retry, catalog recovers');
 
   } finally { await browser.close(); await server.close(); }
