@@ -27,3 +27,10 @@ test("Provider failures never expose technical codes or private messages to cust
   assert.match(text,/thử lại|sản phẩm/);
  }
 });
+
+
+test("Tea-line followups preserve backend-owned line and region context",async()=>{
+ const oldFetch=globalThis.fetch,storage=Object.getOwnPropertyDescriptor(globalThis,"sessionStorage");Object.defineProperty(globalThis,"sessionStorage",{configurable:true,value:{getItem:()=>null}});
+ globalThis.fetch=async(_url,init)=>{const body=JSON.parse(String(init?.body));assert.deepEqual(body.context,{teaLine:"non tom",regionId:21,maxPrice:299999.99});assert.equal(body.message,"Loại nào ít chát?");assert.equal(body.allowLlm,false);return new Response(JSON.stringify({method:"READ_ONLY_BUSINESS_V1",businessKind:"LINE_PRODUCTS",reply:"Fixture",preferences:body.context,businessProducts:[],recommendations:{items:[]},sources:[],llmUsed:false}));};
+ try{const result=await requestRagAdvice("Loại nào ít chát?",{}, {teaLine:"non tom",regionId:21,maxPrice:299999.99},["Chè nõn tôm"],new AbortController().signal,false);assert.equal(result.preferences.teaLine,"non tom");assert.equal(result.llmUsed,false);}finally{globalThis.fetch=oldFetch;if(storage)Object.defineProperty(globalThis,"sessionStorage",storage);else Reflect.deleteProperty(globalThis,"sessionStorage");}
+});

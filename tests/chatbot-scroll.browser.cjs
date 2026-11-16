@@ -9,6 +9,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     for(const width of [1440,390]) {
       const page=await browser.newPage({viewport:{width,height:900}});
       const pageErrors=[];page.on('pageerror',e=>pageErrors.push(e.message));
+      const bodies=[];
       let mode='products',delay=0,calls=0;const product={productId:11,name:'Chè fixture',slug:'fixture',price:150000,stockQuantity:8,weightGrams:100,available:true};
       await page.route('**/api/**',async route=>{
         const path=new URL(route.request().url()).pathname;let data=[];
@@ -18,9 +19,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         else if(path==='/api/cart')data={items:[],totalItems:0,totalAmount:0};
         else if(path==='/api/recommendations')data={method:'CONTENT_BASED_V1',fallback:true,items:[]};
         else if(path==='/api/chatbot/rag') {
-          calls++;const current=mode; if(delay)await new Promise(r=>setTimeout(r,delay));
+          calls++;bodies.push(route.request().postDataJSON());const current=mode; if(delay)await new Promise(r=>setTimeout(r,delay));
           if(current==='503')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'RAG_PROVIDER_UNAVAILABLE'})});
-          data={method:current==='products'?'READ_ONLY_BUSINESS_V1':'RAG_NO_EVIDENCE',reply:current==='products'?'Các sản phẩm phù hợp ngân sách.':'Chưa đủ tài liệu để trả lời câu hỏi này.',businessKind:current==='products'?'PRODUCTS':'KNOWLEDGE',preferences:{maxPrice:300000},recommendations:{items:[]},businessProducts:current==='products'?Array.from({length:12},(_,i)=>({...product,productId:11+i,slug:`fixture-${i}`})):[],sources:[],llmUsed:current!=='products'};
+          data={method:current==='products'?'READ_ONLY_BUSINESS_V1':'RAG_NO_EVIDENCE',reply:current==='products'?'Các sản phẩm phù hợp ngân sách.':'Chưa đủ tài liệu để trả lời câu hỏi này.',businessKind:current==='products'?'LINE_PRODUCTS':'KNOWLEDGE',preferences:{maxPrice:300000,teaLine:'non tom',regionId:21},recommendations:{items:[]},businessProducts:current==='products'?Array.from({length:12},(_,i)=>({...product,productId:11+i,slug:`fixture-${i}`})):[],sources:[],llmUsed:current!=='products'};
         }
         await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
       });
@@ -50,6 +51,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       const pageY=await page.evaluate(()=>window.scrollY);
       mode='503';delay=300;await input.fill('Cách pha chè');await send.click();await assertLatestVisible();await idle();await assertLatestVisible();
       assert.equal(await latest().locator('.tea-chat-products').count(),0);
+      assert.equal(bodies.at(-1).context.teaLine,'non tom');assert.equal(bodies.at(-1).context.regionId,21);
       assert.equal(await chat.locator('.tea-chat-products article').count(),12,'old cards remain inside historical answer');
       assert(await firstAnswer.evaluate(e=>Boolean(e.compareDocumentPosition(e.parentElement.lastElementChild)&Node.DOCUMENT_POSITION_FOLLOWING)));
       assert.equal(await page.evaluate(()=>window.scrollY),pageY);

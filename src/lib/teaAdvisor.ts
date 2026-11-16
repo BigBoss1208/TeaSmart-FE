@@ -1,6 +1,6 @@
 import { api } from "./commerce";
 import type { ApiProduct } from "./commerce";
-export interface TeaPreferences { categoryId?: number; regionId?: number; minPrice?: number; maxPrice?: number;
+export interface TeaPreferences { categoryId?: number; regionId?: number; teaLine?: string; minPrice?: number; maxPrice?: number;
   strength?: number; astringency?: number; aroma?: number; aftertaste?: number; purpose?: "DAILY" | "GIFT" }
 export interface TeaSuggestion { product: ApiProduct; stockQuantity: number; score: number; reasons: string[] }
 export interface TeaRecommendations { method: string; fallback: boolean; items: TeaSuggestion[] }
