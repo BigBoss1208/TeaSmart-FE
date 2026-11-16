@@ -89,3 +89,12 @@ export function chatErrorMessage(error: unknown): string {
 
   return "Không thể xử lý yêu cầu. Hãy kiểm tra câu hỏi và bộ lọc rồi thử lại."
 }
+
+/** Calling a provider is not proof that a grounded answer was produced. */
+export function ragAnswerLabel(answer: Pick<RagAdvice, "method" | "llmUsed" | "sources">): string {
+  if (answer.method === "RAG_NO_EVIDENCE" || answer.method === "KNOWLEDGE_UNAVAILABLE")
+    return "Chưa có đủ tài liệu để trả lời"
+  if (answer.method === "RAG_LLM_V1" && answer.llmUsed && answer.sources?.length)
+    return "Có tham khảo tài liệu"
+  return "Thông tin từ TeaSmart"
+}

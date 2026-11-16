@@ -11,6 +11,7 @@ import { validateTeaForm } from "../lib/teaAdvisor"
 import {
   requestRagAdvice,
   chatErrorMessage,
+  ragAnswerLabel,
   type RagAdvice,
 } from "../lib/ragChat"
 
@@ -255,9 +256,7 @@ export default function ChatbotWidget({
                   <time>{m.at}</time>
                   {m.answer && (
                     <small>
-                      {m.answer.llmUsed
-                        ? "Có tham khảo tài liệu"
-                        : "Thông tin từ TeaSmart"}
+                      {ragAnswerLabel(m.answer)}
                     </small>
                   )}
                   {m.answer?.sources?.map((s) => (

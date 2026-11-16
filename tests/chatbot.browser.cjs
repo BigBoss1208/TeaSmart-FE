@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const browser = await chromium.launch({channel:'chrome',headless:true});
   try {
     const page = await browser.newPage();
-    let fail=false, delay=0, count=12;
+    let fail=false, delay=0, count=12, knowledgeMode="business";
     const calls=[];
     const product={productId:11,name:'Chè kiểm thử widget',slug:'widget-test',price:150000,stockQuantity:8,weightGrams:100,categoryName:'Chè xanh',regionName:'Tân Cương',available:true};
     await page.route('**/api/**', async route => {
@@ -19,6 +19,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       else if(path==='/api/cart')data={items:[],totalItems:0,totalAmount:0};
       else if(path==='/api/chatbot/rag') {
         calls.push(request.postDataJSON());
+        if(knowledgeMode==='unavailable'||knowledgeMode==='timeout')return route.fulfill({status:knowledgeMode==='timeout'?504:503,contentType:'application/json',body:JSON.stringify({code:knowledgeMode==='timeout'?'RAG_TIMEOUT':'RAG_PROVIDER_UNAVAILABLE',message:'private-provider-fixture'})});
+        if(knowledgeMode==='noEvidence'||knowledgeMode==='evidence')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({method:knowledgeMode==='evidence'?'RAG_LLM_V1':'RAG_NO_EVIDENCE',reply:knowledgeMode==='evidence'?'Câu trả lời có nguồn kiểm thử.':'Chưa đủ tài liệu đã xác minh.',businessKind:'KNOWLEDGE',preferences:{},recommendations:{items:[]},businessProducts:[],llmUsed:true,sources:knowledgeMode==='evidence'?[{id:'fixture:0',title:'Nguồn kiểm thử',url:'https://example.invalid/source',publisher:'Fixture',accessedAt:'2026-11-17'}]:[]})});
         if(fail)return route.abort('failed');
         if(delay)await new Promise(resolve=>setTimeout(resolve,delay));
         data={method:'READ_ONLY_BUSINESS_V1',reply:'Dạ, bạn có thể tham khảo sản phẩm bên dưới.',businessKind:'PRODUCTS',businessProducts:Array.from({length:count},(_,i)=>({...product,productId:11+i,slug:`widget-${i}`})),preferences:{maxPrice:200000},recommendations:{items:[]},sources:[],llmUsed:false};
@@ -76,5 +78,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     await page.getByRole('button',{name:'Mở TeaSmart AI',exact:true}).click();
     assert.equal(await page.getByRole('dialog',{name:'TeaSmart AI'}).count(),1);
     console.log('PASS reset, exact four results, close/reopen');
+    knowledgeMode='noEvidence';await input.fill('Cách pha chè?');await submit.click();await idle();
+    assert.equal(await page.getByText('Chưa có đủ tài liệu để trả lời',{exact:true}).count(),1);
+    assert.equal(await page.getByText('Có tham khảo tài liệu',{exact:true}).count(),0);
+    knowledgeMode='evidence';await input.fill('Bảo quản chè?');await submit.click();await idle();
+    assert.equal(await page.getByText('Có tham khảo tài liệu',{exact:true}).count(),1);
+    assert.equal(await page.getByRole('link',{name:'Nguồn kiểm thử',exact:true}).getAttribute('href'),'https://example.invalid/source');
+    for(const mode of ['unavailable','timeout']){
+      knowledgeMode=mode;const before=calls.length;await input.fill('Kiến thức chè?');await submit.click();await idle();
+      assert.equal(calls.length,before+1);
+      assert.doesNotMatch(await page.locator('.tea-chat-window').innerText(),/RAG_PROVIDER|RAG_TIMEOUT|private-provider-fixture/);
+      assert(await page.locator('.tea-chat-window [role="alert"]').count()>0);
+    }
+    knowledgeMode='business';await input.fill('Chè dưới 300k');await submit.click();await idle();
+    assert.equal(await page.locator('.tea-chat-products article').count(),4);
+    console.log('PASS mock knowledge with/without evidence, safe 503/504, no automatic retry, catalog recovers');
+
   } finally { await browser.close(); await server.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});
