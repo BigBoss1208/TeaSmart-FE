@@ -41,9 +41,10 @@ test("advisor contract, budget validation, authentication and truthful UI states
         return new Response(JSON.stringify({ method: "READ_ONLY_BUSINESS_V1", reply: "Thông tin sản phẩm", preferences: {}, notices: [], recommendations: { items: [] }, llmUsed: false, sources: [] }), { status: 200 });
       };
       for (const productId of [11, 22, undefined]) {
-        await rag.requestRagAdvice("Giá bao nhiêu?", {}, undefined, [], new AbortController().signal, false, productId);
+        await rag.requestRagAdvice("Giá bao nhiêu?", {}, undefined, [], new AbortController().signal, false, productId, [11, 22]);
       }
       assert.deepEqual(bodies.map(body => body.productId), [11, 22, undefined]);
+      assert.deepEqual(bodies[0].suggestedProductIds, [11, 22]);
       assert.equal(Object.hasOwn(bodies[2], "productId"), false);
     });
     await t.test("locked account 401 clears old token, no fabricated fallback", async () => {
