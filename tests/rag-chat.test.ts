@@ -34,3 +34,16 @@ test("Tea-line followups preserve backend-owned line and region context",async()
  globalThis.fetch=async(_url,init)=>{const body=JSON.parse(String(init?.body));assert.deepEqual(body.context,{teaLine:"non tom",regionId:21,maxPrice:299999.99});assert.equal(body.message,"Loại nào ít chát?");assert.equal(body.allowLlm,false);return new Response(JSON.stringify({method:"READ_ONLY_BUSINESS_V1",businessKind:"LINE_PRODUCTS",reply:"Fixture",preferences:body.context,businessProducts:[],recommendations:{items:[]},sources:[],llmUsed:false}));};
  try{const result=await requestRagAdvice("Loại nào ít chát?",{}, {teaLine:"non tom",regionId:21,maxPrice:299999.99},["Chè nõn tôm"],new AbortController().signal,false);assert.equal(result.preferences.teaLine,"non tom");assert.equal(result.llmUsed,false);}finally{globalThis.fetch=oldFetch;if(storage)Object.defineProperty(globalThis,"sessionStorage",storage);else Reflect.deleteProperty(globalThis,"sessionStorage");}
 });
+
+test("Knowledge quotas produce a friendly message and suppress immediate retry", async () => {
+ const {chatErrorMessage,canRetryChat,hasGroundedSources}=await import("../src/lib/ragChat.ts");
+ const {ApiError}=await import("../src/lib/commerce.ts");
+ for(const [status,code] of [[429,"RAG_DEMO_LIMIT_REACHED"],[503,"RAG_RATE_LIMITED"]] as const){
+  const error=new ApiError(status,code,"fixture-private-detail");
+  assert.match(chatErrorMessage(error),/giới hạn lượt hỏi/);
+  assert.doesNotMatch(chatErrorMessage(error),/RAG_|fixture-private/);
+  assert.equal(canRetryChat(error),false);
+ }
+ assert.equal(canRetryChat(new ApiError(503,"RAG_CALLS_DISABLED","fixture")),false);
+ assert.equal(hasGroundedSources({method:"RAG_NO_EVIDENCE",llmUsed:true,evidenceStatus:"MODEL_ABSTAINED",sources:[{id:"bad",title:"Bad",url:"https://example.invalid",publisher:"Fixture",accessedAt:"2026-11-18"}]}),false);
+});

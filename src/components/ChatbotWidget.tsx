@@ -11,6 +11,8 @@ import { validateTeaForm } from "../lib/teaAdvisor"
 import {
   requestRagAdvice,
   chatErrorMessage,
+  canRetryChat,
+  hasGroundedSources,
   ragAnswerLabel,
   type RagAdvice,
 } from "../lib/ragChat"
@@ -48,6 +50,7 @@ export default function ChatbotWidget({
   const [failedQuestion, setFailedQuestion] = useState<string | null>(null)
 
   const suggested = useRef<number[]>([])
+  const conversationId = useRef<string | undefined>(undefined)
 
   const abort = useRef<AbortController | null>(null),
     flight = useRef(false),
@@ -98,6 +101,7 @@ export default function ChatbotWidget({
     setMessages([]);
     context.current = undefined;
     suggested.current = [];
+    conversationId.current = undefined;
     setImages({});
     setText("");
     setFailedQuestion(null);
@@ -136,6 +140,7 @@ export default function ChatbotWidget({
       return
     }
     flight.current = true
+    conversationId.current ??= globalThis.crypto?.randomUUID?.()
     setBusy(true)
     if (value === text) setText("")
     setFailedQuestion(null)
@@ -158,6 +163,7 @@ export default function ChatbotWidget({
         undefined,
         productId,
         suggested.current,
+        conversationId.current,
       )
       if (controller.signal.aborted) return
       if (
@@ -212,7 +218,7 @@ export default function ChatbotWidget({
       if (!controller.signal.aborted) {
         const error = chatErrorMessage(e)
         setMessages((m) => [...m, { text: error, at, failed: true }])
-        setFailedQuestion(value)
+        if (canRetryChat(e)) setFailedQuestion(value)
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -300,7 +306,7 @@ export default function ChatbotWidget({
                           {ragAnswerLabel(m.answer)}
                         </small>
                       )}
-                      {m.answer?.sources?.map((s) => (
+                      {m.answer && hasGroundedSources(m.answer) && m.answer.sources?.map((s) => (
                         <a
                           key={s.id}
                           href={s.url}

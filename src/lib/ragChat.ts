@@ -25,6 +25,7 @@ export interface RagAdvice extends TeaAdvice {
   sources?: RagSource[]
   embeddingMethod?: string | null
   llmUsed?: boolean
+  evidenceStatus?: "CITED_EVIDENCE" | "NO_RETRIEVAL" | "MODEL_ABSTAINED" | null
   businessKind?: string
   businessProducts?: BusinessProduct[]
 }
@@ -38,12 +39,14 @@ export function requestRagAdvice(
   allowLlm = true,
   productId?: number,
   suggestedProductIds?: number[],
+  conversationId?: string,
 ): Promise<RagAdvice> {
   return api<RagAdvice>("/chatbot/rag", {
     method: "POST",
     signal: AbortSignal.any([signal, AbortSignal.timeout(45000)]),
     body: JSON.stringify({
       message: message.trim(),
+      ...(conversationId && { conversationId }),
       preferences,
       ...(suggestedProductIds?.length && {
         suggestedProductIds: suggestedProductIds.slice(0, 4),
@@ -78,7 +81,13 @@ export function chatErrorMessage(error: unknown): string {
   if (["RAG_DISABLED", "RAG_NOT_CONFIGURED"].includes(error.code ?? ""))
     return "Tư vấn kiến thức chưa được cấu hình. Bạn vẫn có thể hỏi sản phẩm, ngân sách, khẩu vị và tồn kho từ danh mục TeaSmart."
 
-  if (error.code === "RAG_LLM_DISABLED")
+  if (error.status === 429 || ["RAG_RATE_LIMITED", "RAG_DEMO_LIMIT_REACHED"].includes(error.code ?? ""))
+    return "Tư vấn kiến thức đã chạm giới hạn lượt hỏi. Bạn có thể quay lại sau hoặc hỏi mình về sản phẩm TeaSmart."
+
+  if (error.code === "RAG_BUSY")
+    return "Mình đang xử lý một câu hỏi kiến thức khác. Bạn có thể thử lại sau ít phút."
+
+  if (error.code === "RAG_CALLS_DISABLED" || error.code === "RAG_LLM_DISABLED")
     return "Mình chưa thể trả lời câu hỏi kiến thức này lúc này. Bạn vẫn có thể hỏi về sản phẩm hoặc cách mua hàng."
 
   if (error.status === 504 || error.code === "RAG_TIMEOUT")
@@ -90,11 +99,22 @@ export function chatErrorMessage(error: unknown): string {
   return "Không thể xử lý yêu cầu. Hãy kiểm tra câu hỏi và bộ lọc rồi thử lại."
 }
 
+export function canRetryChat(error: unknown): boolean {
+  return !(error instanceof ApiError && (
+    error.status === 429 || ["RAG_RATE_LIMITED", "RAG_CALLS_DISABLED", "RAG_DEMO_LIMIT_REACHED"].includes(error.code ?? "")
+  ))
+}
+
+export function hasGroundedSources(answer: Pick<RagAdvice, "method" | "llmUsed" | "sources" | "evidenceStatus">): boolean {
+  return answer.method === "RAG_LLM_V1" && answer.llmUsed === true && !!answer.sources?.length
+    && (answer.evidenceStatus == null || answer.evidenceStatus === "CITED_EVIDENCE")
+}
+
 /** Calling a provider is not proof that a grounded answer was produced. */
-export function ragAnswerLabel(answer: Pick<RagAdvice, "method" | "llmUsed" | "sources">): string {
+export function ragAnswerLabel(answer: Pick<RagAdvice, "method" | "llmUsed" | "sources" | "evidenceStatus">): string {
   if (answer.method === "RAG_NO_EVIDENCE" || answer.method === "KNOWLEDGE_UNAVAILABLE")
     return "Chưa có đủ tài liệu để trả lời"
-  if (answer.method === "RAG_LLM_V1" && answer.llmUsed && answer.sources?.length)
+  if (hasGroundedSources(answer))
     return "Có tham khảo tài liệu"
   return "Thông tin từ TeaSmart"
 }

@@ -19,6 +19,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       else if(path==='/api/cart')data={items:[],totalItems:0,totalAmount:0};
       else if(path==='/api/chatbot/rag') {
         calls.push(request.postDataJSON());
+        if(knowledgeMode==='limited')return route.fulfill({status:429,json:{code:'RAG_DEMO_LIMIT_REACHED'}});
         if(knowledgeMode==='unavailable'||knowledgeMode==='timeout')return route.fulfill({status:knowledgeMode==='timeout'?504:503,contentType:'application/json',body:JSON.stringify({code:knowledgeMode==='timeout'?'RAG_TIMEOUT':'RAG_PROVIDER_UNAVAILABLE',message:'private-provider-fixture'})});
         if(knowledgeMode==='noEvidence'||knowledgeMode==='evidence')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({method:knowledgeMode==='evidence'?'RAG_LLM_V1':'RAG_NO_EVIDENCE',reply:knowledgeMode==='evidence'?'Câu trả lời có nguồn kiểm thử.':'Chưa đủ tài liệu đã xác minh.',businessKind:'KNOWLEDGE',preferences:{},recommendations:{items:[]},businessProducts:[],llmUsed:true,sources:knowledgeMode==='evidence'?[{id:'fixture:0',title:'Nguồn kiểm thử',url:'https://example.invalid/source',publisher:'Fixture',accessedAt:'2026-11-17'}]:[]})});
         if(fail)return route.abort('failed');
@@ -42,6 +43,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     await page.locator('.tea-chat-products article').first().waitFor(); await idle();
     assert.equal(await input.inputValue(),'câu tiếp theo đang soạn');
     assert.equal(calls.length,1); assert.equal(Object.hasOwn(calls[0],'allowLlm'),false);
+    assert.match(calls[0].conversationId,/^[a-f0-9-]{36}$/);
     console.log('PASS accepted send clears input, late response preserves new draft, double submit blocked');
     assert.equal(await page.locator('[data-chat-message].tea-chat-ai').last().locator('.tea-chat-products article').count(),4);
     const requestCount=calls.length, messageCount=await page.locator('.tea-chat-user').count();
@@ -72,6 +74,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
     count=4; await input.fill('chè'); await input.dispatchEvent('keydown',{key:'Enter',code:'Enter',isComposing:true}); assert.equal(calls.length,emptyCount); await input.press('Shift+Enter');
     assert.equal(calls.length,3); // Shift+Enter inserts a newline without submitting
     await submit.click(); await idle();
+    assert.notEqual(calls.at(-1).conversationId,calls[0].conversationId);
     assert.equal(calls.at(-1).context,undefined);assert.equal(calls.at(-1).suggestedProductIds,undefined);assert.deepEqual(calls.at(-1).history,[]);
     assert.equal(await page.getByRole('button',{name:'Xem thêm sản phẩm',exact:true}).count(),0);
     await page.getByRole('button',{name:'Đóng chatbot',exact:true}).click();
@@ -90,9 +93,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       assert.doesNotMatch(await page.locator('.tea-chat-window').innerText(),/RAG_PROVIDER|RAG_TIMEOUT|private-provider-fixture/);
       assert(await page.locator('.tea-chat-window [role="alert"]').count()>0);
     }
+    const beforeLimited=calls.length;knowledgeMode='limited';
+    await input.fill('Pha lần hai thì sao?');await submit.click();await idle();
+    assert.equal(calls.length,beforeLimited+1);
+    assert.equal(calls.at(-1).conversationId,calls.at(-2).conversationId);
+    assert(calls.at(-1).history.some(question=>question.includes('Bảo quản chè')));
+    await page.getByText(/đã chạm giới hạn lượt hỏi/).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Thử lại câu hỏi',exact:true}).count(),0);
     knowledgeMode='business';await input.fill('Chè dưới 300k');await submit.click();await idle();
     assert.equal(await page.locator('[data-chat-message].tea-chat-ai').last().locator('.tea-chat-products article').count(),4);
-    console.log('PASS mock knowledge with/without evidence, safe 503/504, no automatic retry, catalog recovers');
+    console.log('PASS mock knowledge with/without evidence, safe 429/503/504, stable conversation, no automatic retry, catalog recovers');
 
   } finally { await browser.close(); await server.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});
