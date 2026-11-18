@@ -26,7 +26,6 @@ import { readPendingCheckout, ApiError, api, errorMessage, mapUser, mapProduct, 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Product, Page, Order, Category, Customer, Review, TeaRegion, TeaShop, User, AdminSubView } from "./types";
 import {
-  initialProducts,
   teaRegionsData,
   teaShopsData,
   initialCategories,
@@ -951,11 +950,13 @@ function PolicyPage() {
 /* ========================================================
    ROUTER HELPERS (URL SYNCHRONIZATION)
    ======================================================== */
-function getInitialRoute(): { page: Page; adminSubView: AdminSubView } {
+function getInitialRoute(): { page: Page; adminSubView: AdminSubView; productId?: number } {
   if (typeof window === "undefined") {
     return { page: "home", adminSubView: "Dashboard" };
   }
   const path = window.location.pathname;
+  const productId = Number(path.match(/^\/products\/([1-9][0-9]*)\/?$/)?.[1]);
+  if (Number.isSafeInteger(productId)) return { page: "product", adminSubView: "Dashboard", productId };
   if (path === "/quen-mat-khau") return { page: "forgot-password", adminSubView: "Dashboard" };
   if (path === "/dat-lai-mat-khau") return { page: "reset-password", adminSubView: "Dashboard" };
   if (path === "/seller") return { page: "seller", adminSubView: "Dashboard" };
@@ -1089,7 +1090,7 @@ export default function App() {
 
   const [authSuccessMsg, setAuthSuccessMsg] = useState("");
 
-  const [selectedProductId, setSelectedProductId] = useState<number>(initialProducts[0].id);
+  const [selectedProductId, setSelectedProductId] = useState<number | undefined>(initialRoute.productId);
   const [selectedRegionId, setSelectedRegionId] = useState<string>("tan-cuong");
   const [selectedShopId, setSelectedShopId] = useState<string>("htx-hao-dat");
 
@@ -1123,7 +1124,7 @@ export default function App() {
     const draft={owner:String(currentUser.id),items};setSelectedCart(draft);sessionStorage.setItem("teasmart_selected_cart",JSON.stringify(draft));setBuyNow(null);sessionStorage.removeItem("teasmart_buy_now");setBuyAgain(null);sessionStorage.removeItem("teasmart_buy_again");navigate("checkout");
   };
   const directPurchase = buyNow?.owner === String(currentUser?.id) ? buyNow : null;
-  const navigate = (p: Page, subView?: AdminSubView) => {
+  const navigate = (p: Page, subView?: AdminSubView, productId?: number) => {
     if (p === "ai") { setChatOpenSignal(n => n + 1); return; }
     if (p === "checkout") sessionStorage.removeItem(checkoutReceiptKey);
     if (p !== "checkout") { setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again"); }
@@ -1133,7 +1134,9 @@ export default function App() {
     if (p === "admin") {
       if (subView) setAdminSubView(subView);
     }
-    const targetPath = getPathForPage(p, subView || adminSubView);
+    const targetPath = p === "product" && productId !== undefined
+      ? `/products/${productId}`
+      : getPathForPage(p, subView || adminSubView);
     if (window.location.pathname !== targetPath) {
       window.history.pushState(null, "", targetPath);
     }
@@ -1145,6 +1148,7 @@ export default function App() {
       const route = getInitialRoute();
       if (route.page !== "checkout") { setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again"); }
       setRouteRevision(n => n + 1);
+      setSelectedProductId(route.productId);
       setPage(route.page);
       setAdminSubView(route.adminSubView);
     };
@@ -1311,7 +1315,7 @@ export default function App() {
 
   const handleSelectProduct = (prod: Product) => {
     setSelectedProductId(prod.id);
-    navigate("product");
+    navigate("product", undefined, prod.id);
   };
 
   // Chat answers can contain a newly available product absent from the initial catalog snapshot.
@@ -1374,7 +1378,7 @@ export default function App() {
 
   // Selected current objects
   const currentProduct =
-    products.find((p) => p.id === selectedProductId) || products[0];
+    products.find((p) => p.id === selectedProductId);
   const currentRegion =
     regions.find((r) => r.id === selectedRegionId) || regions[0];
   const currentShop =

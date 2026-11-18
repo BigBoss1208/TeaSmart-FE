@@ -11,16 +11,22 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       const pageErrors=[];page.on('pageerror',e=>pageErrors.push(e.message));
       const bodies=[];
       let mode='products',delay=0,calls=0;const product={productId:11,name:'Chè fixture',slug:'fixture',price:150000,stockQuantity:8,weightGrams:100,available:true};
+      const second={...product,productId:12,name:'Chè fixture B',slug:'fixture-1'};
       await page.route('**/api/**',async route=>{
         const path=new URL(route.request().url()).pathname;let data=[];
         if(path==='/api/users/me')data={userId:999,fullName:'Fixture',email:'fixture@example.invalid',role:'CUSTOMER'};
-        else if(path==='/api/products')data={content:[product],totalPages:1,totalElements:1};
-        else if(path.startsWith('/api/products/'))data=product;
+        else if(path==='/api/products')data={content:[product,second],totalPages:1,totalElements:2};
+        else if(path.startsWith('/api/products/'))data=path.endsWith('/fixture-1')?second:product;
         else if(path==='/api/cart')data={items:[],totalItems:0,totalAmount:0};
         else if(path==='/api/recommendations')data={method:'CONTENT_BASED_V1',fallback:true,items:[]};
         else if(path==='/api/chatbot/rag') {
           calls++;bodies.push(route.request().postDataJSON());const current=mode; if(delay)await new Promise(r=>setTimeout(r,delay));
           if(current==='503')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'RAG_PROVIDER_UNAVAILABLE'})});
+          if(current==='current') {
+            const active=[product,second].find(p=>p.productId===bodies.at(-1).productId);
+            data={method:'READ_ONLY_BUSINESS_V1',reply:active?.name ?? 'Bạn muốn hỏi sản phẩm nào?',businessKind:active?'CURRENT_PRODUCT':'CLARIFICATION',preferences:{},recommendations:{items:[]},businessProducts:active?[active]:[]};
+            return route.fulfill({status:200,json:data});
+          }
           data={method:current==='products'?'READ_ONLY_BUSINESS_V1':'RAG_NO_EVIDENCE',reply:current==='products'?'Các sản phẩm phù hợp ngân sách.':'Chưa đủ tài liệu để trả lời câu hỏi này.',businessKind:current==='products'?'LINE_PRODUCTS':'KNOWLEDGE',preferences:{maxPrice:300000,teaLine:'non tom',regionId:21},recommendations:{items:[]},businessProducts:current==='products'?Array.from({length:12},(_,i)=>({...product,productId:11+i,slug:`fixture-${i}`})):[],sources:[],llmUsed:current!=='products'};
         }
         await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
@@ -80,7 +86,28 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       assert.equal(await chat.evaluate(e=>e.scrollTop),rest,'no idle scroll jitter');
       await firstAnswer.getByRole('button',{name:'Xem chi tiết',exact:true}).first().click();
       await page.locator('.product-purchase').waitFor({state:'visible'});
-      await page.waitForTimeout(100);assert.deepEqual(pageErrors,[],'no browser application errors');
+      mode='current';
+      async function askCurrent(expected, productId) {
+        await input.fill('Sản phẩm tôi đang mở là gì?');
+        await send.click();
+        await idle();
+        assert.equal(bodies.at(-1).productId,productId);
+        assert.equal(bodies.at(-1).context.teaLine,'non tom');
+        assert.equal(await latest().locator('p').first().textContent(),expected);
+        await assertLatestVisible();
+      }
+      await askCurrent('Chè fixture',11);
+      assert.equal(await firstAnswer.locator('article').count(),12,'navigation keeps chat history');
+      await firstAnswer.getByRole('button',{name:'Xem chi tiết',exact:true}).nth(1).click();
+      await page.waitForURL('**/products/12');
+      await askCurrent('Chè fixture B',12);
+      await page.goBack();
+      await page.waitForURL('**/products/11');
+      await askCurrent('Chè fixture',11);
+      await page.goBack();
+      await page.waitForURL('http://127.0.0.1:4177/');
+      await askCurrent('Bạn muốn hỏi sản phẩm nào?',undefined);
+      assert.deepEqual(pageErrors,[],'no browser application errors');
       console.log(`PASS ${width}px: ordered cards, pagination, async fallback, NO_EVIDENCE, history scroll, new send, page position, suggestions, details`);
       await page.close();
     }

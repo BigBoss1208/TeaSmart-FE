@@ -105,7 +105,14 @@ export default function ChatbotWidget({
     lastScrollTop.current = 0;
   }
 
-  useEffect(() => { resetConversation(); }, [customer, productId]);
+  useEffect(() => { resetConversation(); }, [customer]);
+
+  useLayoutEffect(() => {
+    abort.current?.abort();
+    flight.current = false;
+    setBusy(false);
+    setFailedQuestion(null);
+  }, [productId]);
 
   function close() {
     abort.current?.abort()
@@ -155,6 +162,7 @@ export default function ChatbotWidget({
       if (controller.signal.aborted) return
       if (
         ![
+          "CURRENT_PRODUCT",
           "CUSTOMER_SUPPORT",
           "OUT_OF_SCOPE",
           "GREETING",
@@ -165,7 +173,7 @@ export default function ChatbotWidget({
         ].includes(answer.businessKind ?? "")
       )
         context.current = answer.preferences
-      if (answer.businessProducts?.length)
+      if (answer.businessKind !== "CURRENT_PRODUCT" && answer.businessProducts?.length)
         suggested.current = answer.businessProducts
           .map((p) => p.productId)
           .slice(0, 4)
