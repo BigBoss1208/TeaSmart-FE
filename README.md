@@ -8,6 +8,8 @@ TeaSmart là website thương mại điện tử chuyên về chè Thái Nguyên
 
 [Repository TeaSmart-Be](https://github.com/BigBoss1208/TeaSmart-Be)
 
+[Kho nghiên cứu MobileNetV2 · mã huấn luyện, hồ sơ làm sạch và kết quả Test](https://github.com/BigBoss1208/TeaSmart-AI-Leaf)
+
 ## Mục lục
 
 - [Giao diện TeaSmart](#giao-diện-teasmart)
