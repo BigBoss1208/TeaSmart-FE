@@ -1,6 +1,6 @@
 # <img src="docs/brand/leaf.svg" width="32" alt=""> TeaSmart Frontend
 
-![React 19.3.0](https://img.shields.io/badge/React-19.3.0-176548) ![TypeScript 5.9.3](https://img.shields.io/badge/TypeScript-5.9.3-176548) ![Vite 8.3.3](https://img.shields.io/badge/Vite-8.3.3-176548)
+![React 19.3.0 · TypeScript 5.9.3 · Vite 8.3.3](docs/brand/technologies.svg)
 
 TeaSmart là website thương mại điện tử chuyên về chè Thái Nguyên. Giao diện kết nối khách hàng, người bán và quản trị viên với danh mục sản phẩm, quy trình đặt hàng và các công cụ AI tư vấn, phân tích đánh giá và hỗ trợ nhận diện tình trạng lá chè.
 
