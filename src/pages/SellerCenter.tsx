@@ -116,7 +116,13 @@ export default function SellerCenter({ user, onLogin, onShopping }: { user: User
         </>}
         {state.status === "ACTIVE" && state.productsEnabled && statistics && <AdminOverview statistics seller/>}
         {state.status === "ACTIVE" && overview && <div className="seller-overview">
-          <div className="seller-welcome-banner" role="button" tabIndex={0} aria-label="Xem tổng quan kinh doanh" onClick={()=>document.getElementById("seller-business-overview")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"})} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.currentTarget.click()}}}><span>Chào mừng trở lại,</span><h2>{state.shop?.name} 👋</h2><p>Quản lý sản phẩm, đơn hàng và theo dõi hiệu quả kinh doanh<br/>của gian hàng tại TeaSmart.</p></div>
+          <div className="seller-welcome-banner" role="button" tabIndex={0} aria-label="Xem tổng quan kinh doanh" onClick={()=>document.getElementById("seller-business-overview")?.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"})} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.currentTarget.click()}}}><div className="seller-welcome-copy">
+            <span>Chào mừng trở lại,</span>
+            <h2>{state.shop?.name} <span aria-hidden="true">👋</span></h2>
+            <p>Quản lý sản phẩm, đơn hàng và theo dõi hiệu quả kinh doanh của gian hàng tại TeaSmart.</p>
+          </div>
+          <span className="seller-welcome-sprig" aria-hidden="true"><i/><i/><i/></span>
+          </div>
           {!state.productsEnabled && <p className="seller-notice" role="status">Quản lý sản phẩm và đơn hàng chưa được mở trên môi trường này. Bạn có thể cập nhật thông tin gian hàng; hãy liên hệ quản trị viên để được hỗ trợ.</p>}
           {state.productsEnabled && <SellerDashboard onCreate={()=>{showOverview(false);showProducts(true);setCreateProduct(true)}} onProducts={()=>{showOverview(false);showProducts(true);setCreateProduct(false)}} onOrders={()=>{showOverview(false);showOrders(true)}} onStatistics={()=>{showOverview(false);showStatistics(true)}}/>}
         </div>}

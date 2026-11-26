@@ -6,6 +6,7 @@ import {loadTasteCatalog, matchesTaste, type TasteProduct} from "./lib/tasteCata
 import CartCatalog from "./components/CartCatalog";
 import SellerCenter from "./pages/SellerCenter";
 import {checkoutReceiptKey} from "./lib/checkoutReceipt";
+import { loginReturnKey, parseLoginReturn } from "./lib/loginReturn";
 import "./pages/CustomerExperience.css";
 import MyReviews from "./components/MyReviews";
 import AccountSettings from "./components/AccountSettings";
@@ -950,11 +951,9 @@ function PolicyPage() {
 /* ========================================================
    ROUTER HELPERS (URL SYNCHRONIZATION)
    ======================================================== */
-function getInitialRoute(): { page: Page; adminSubView: AdminSubView; productId?: number } {
-  if (typeof window === "undefined") {
-    return { page: "home", adminSubView: "Dashboard" };
-  }
-  const path = window.location.pathname;
+function getInitialRoute(path = typeof window === "undefined" ? "/" : window.location.pathname): {
+  page: Page; adminSubView: AdminSubView; productId?: number;
+} {
   const productId = Number(path.match(/^\/products\/([1-9][0-9]*)\/?$/)?.[1]);
   if (Number.isSafeInteger(productId)) return { page: "product", adminSubView: "Dashboard", productId };
   if (path === "/quen-mat-khau") return { page: "forgot-password", adminSubView: "Dashboard" };
@@ -1003,6 +1002,27 @@ function getInitialRoute(): { page: Page; adminSubView: AdminSubView; productId?
     return { page: "policy", adminSubView: "Dashboard" };
   }
   return { page: "home", adminSubView: "Dashboard" };
+}
+
+const paymentLoginReturnKey = "teasmart_payment_return";
+const orderLoginReturnKey = "teasmart_order_return";
+
+function isAuthPage(page: Page) {
+  return page === "login" || page === "register" || page === "forgot-password" || page === "reset-password";
+}
+
+function customerLoginDestination(value: string | null) {
+  const target = parseLoginReturn(value, window.location.origin);
+  if (!target) return null;
+  const route = getInitialRoute(target.pathname);
+  if (isAuthPage(route.page) || route.page === "admin" || route.page === "payment-return"
+    || route.page === "payment-incomplete" || (route.page === "home" && target.pathname !== "/")) return null;
+  return route;
+}
+
+function clearLoginReturns() {
+  for (const key of [loginReturnKey, paymentLoginReturnKey, orderLoginReturnKey,
+    "teasmart_seller_return", "teasmart_account_return"]) sessionStorage.removeItem(key);
 }
 
 function getPathForPage(p: Page, adminSubView?: AdminSubView): string {
@@ -1143,37 +1163,63 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const requireLogin = (replace = false, returnTo = window.location.pathname + window.location.search + window.location.hash) => {
+    clearLoginReturns();
+    if (customerLoginDestination(returnTo)) sessionStorage.setItem(loginReturnKey, returnTo);
+    if (replace) window.history.replaceState(null, "", getPathForPage("login"));
+    navigate("login");
+  };
+
+  const navigateWithLoginReturn = (next: Page) => {
+    if (next === "login") requireLogin();
+    else navigate(next);
+  };
+
+  const applyRoute = (route: ReturnType<typeof getInitialRoute>) => {
+    if (route.page !== "checkout") { setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again"); }
+    setRouteRevision(n => n + 1);
+    setSelectedProductId(route.productId);
+    setPage(route.page);
+    setAdminSubView(route.adminSubView);
+  };
+
   useEffect(() => {
-    const handlePopState = () => {
-      const route = getInitialRoute();
-      if (route.page !== "checkout") { setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again"); }
-      setRouteRevision(n => n + 1);
-      setSelectedProductId(route.productId);
-      setPage(route.page);
-      setAdminSubView(route.adminSubView);
-    };
+    const handlePopState = () => applyRoute(getInitialRoute());
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  useEffect(() => {
+    if (!isAuthPage(page)) clearLoginReturns();
+  }, [page]);
+
+  useEffect(() => {
+    if (page === "cart" && authState === "guest") requireLogin(true);
+  }, [page, authState]);
+
   const handleLogin = (user: User) => {
-    setCurrentUser(user); setAuthState("ready"); setAuthSuccessMsg("");
-    if (user.role === "USER" && sessionStorage.getItem("teasmart_seller_return") === "/seller") {
-      sessionStorage.removeItem("teasmart_seller_return"); navigate("seller"); return;
-    }
+    const resume = sessionStorage.getItem(loginReturnKey);
+    const detailReturn = sessionStorage.getItem(orderLoginReturnKey);
+    const paymentReturn = sessionStorage.getItem(paymentLoginReturnKey);
     const accountReturn = sessionStorage.getItem("teasmart_account_return");
-    if (user.role === "USER" && accountReturn === "/account?tab=favorites") {
-      sessionStorage.removeItem("teasmart_account_return");
-      window.history.replaceState(null, "", accountReturn);
-      setRouteRevision(n => n + 1); setPage("account"); return;
+    const sellerReturn = sessionStorage.getItem("teasmart_seller_return");
+    clearLoginReturns();
+    setCurrentUser(user); setAuthState("ready"); setAuthSuccessMsg("");
+
+    if (user.role === "USER") {
+      const target = resume ?? (sellerReturn === "/seller" ? sellerReturn : null)
+        ?? (accountReturn === "/account?tab=favorites" ? accountReturn : null)
+        ?? (detailReturn && /^\/account\/orders\/[1-9][0-9]*$/.test(detailReturn) ? detailReturn : null);
+      const route = customerLoginDestination(target);
+      if (target && route) {
+        window.history.replaceState(null, "", target);
+        applyRoute(route);
+        return;
+      }
     }
-    const detailReturn = sessionStorage.getItem("teasmart_order_return");
-    if (user.role === "USER" && detailReturn && /^\/account\/orders\/[1-9][0-9]*$/.test(detailReturn)) {
-      sessionStorage.removeItem("teasmart_order_return"); window.history.replaceState(null, "", detailReturn); setRouteRevision(n => n + 1); setPage("order-detail"); return;
-    }
-    const returnPath = sessionStorage.getItem("teasmart_payment_return");
-    if (user.role === "USER" && (returnPath?.startsWith("/payment/vnpay-return?") || returnPath === "/payment/incomplete")) {
-      sessionStorage.removeItem("teasmart_payment_return"); window.history.replaceState(null, "", returnPath); setPage(returnPath === "/payment/incomplete" ? "payment-incomplete" : "payment-return");
+    if (user.role === "USER" && (paymentReturn?.startsWith("/payment/vnpay-return?") || paymentReturn === "/payment/incomplete")) {
+      window.history.replaceState(null, "", paymentReturn);
+      setPage(paymentReturn === "/payment/incomplete" ? "payment-incomplete" : "payment-return");
     } else navigate(user.role === "ADMIN" ? "admin" : "home", "Dashboard");
   };
 
@@ -1197,8 +1243,7 @@ export default function App() {
     sessionStorage.removeItem("teasmart_access_token");
     sessionStorage.removeItem("teasmart_checkout");
     sessionStorage.removeItem("teasmart_checkout_session");
-    sessionStorage.removeItem("teasmart_payment_return");
-    sessionStorage.removeItem("teasmart_account_return");
+    clearLoginReturns();
     sessionStorage.removeItem("teasmart_buy_now"); setBuyNow(null);
     sessionStorage.removeItem("teasmart_buy_again"); setBuyAgain(null);
     try {
@@ -1212,7 +1257,7 @@ export default function App() {
   async function refreshCart() { setCart(mapCart(await api<ApiCart>("/cart"))); }
   const addToCart = async (product: Product, _weight?: string, quantity = 1) => {
     if (!Number.isInteger(quantity) || quantity < 1) return false;
-    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return false; }
+    if (!currentUser || currentUser.role !== "USER") { requireLogin(); return false; }
     if (!products.some(p => p.id === product.id && p.name === product.name)) {
       setCommerceError("Sản phẩm này chưa có trong danh mục bán hàng hiện tại."); return false;
     }
@@ -1222,7 +1267,7 @@ export default function App() {
     } catch (e) { setCommerceError(errorMessage(e)); return false; }
   };
   const handleBuyNow = (product: Product, weight?: string, quantity = 1) => {
-    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return; }
+    if (!currentUser || currentUser.role !== "USER") { requireLogin(); return; }
     if (!Number.isInteger(quantity) || quantity < 1) return;
     setSelectedCart(null);sessionStorage.removeItem("teasmart_selected_cart");
     setBuyAgain(null); sessionStorage.removeItem("teasmart_buy_again");
@@ -1231,7 +1276,7 @@ export default function App() {
     setBuyNow(draft); navigate("checkout");
   };
   const handleBuyAgain = (items: { product: Product; quantity: number }[]) => {
-    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return; }
+    if (!currentUser || currentUser.role !== "USER") { requireLogin(); return; }
     if (!items.length || items.some(item => !Number.isInteger(item.quantity) || item.quantity < 1)) return;
     if (readPendingCheckout(String(currentUser.id))) { setCommerceError("Vui lòng kiểm tra yêu cầu checkout trước đó trước khi mua lại."); return; }
     setBuyNow(null); sessionStorage.removeItem("teasmart_buy_now");
@@ -1286,8 +1331,7 @@ export default function App() {
   };
   const openFavorites = () => {
     if (!currentUser) {
-      sessionStorage.setItem("teasmart_account_return", "/account?tab=favorites");
-      navigate("login");
+      requireLogin(false, "/account?tab=favorites");
       return;
     }
     window.history.pushState(null, "", "/account?tab=favorites"); setRouteRevision(n => n + 1); setPage("account"); window.scrollTo(0, 0);
@@ -1303,7 +1347,7 @@ export default function App() {
     return () => { live = false; };
   }, [currentUser?.id]);
   const toggleFavorite = async (productId: number) => {
-    if (!currentUser || currentUser.role !== "USER") { navigate("login"); return; }
+    if (!currentUser || currentUser.role !== "USER") { requireLogin(); return; }
     if (wishlistBusy.current) return;
     const owner = currentUser.id; wishlistBusy.current = true;
     try {
@@ -1493,9 +1537,11 @@ export default function App() {
       {page === "shops" && <TeaShopsList onSelectShop={handleSelectShop} onSelectProduct={handleSelectProduct} onAddToCart={addToCart} favorites={favorites} onToggleFavorite={toggleFavorite} />}
       {page === "shop-detail" && <TeaShopDetail shop={currentShop} products={products} onSelectProduct={handleSelectProduct} onAddToCart={addToCart} onBuyNow={handleBuyNow} favorites={favorites} onToggleFavorite={toggleFavorite} onBack={() => navigate("shops")} />}
 
-      {page === "cart" && (
+      {page === "cart" && (authState === "loading" || authState === "guest" ? (
+        <main className="page simple-page"><p role="status">Đang xác minh phiên đăng nhập…</p></main>
+      ) : (
         <Cart key={String(currentUser?.id)} userId={String(currentUser?.id)} cart={cart} updateCart={updateCart} navigate={navigate} onCheckout={checkoutSelected} onSelectProduct={handleSelectProduct} />
-      )}
+      ))}
 
       {page === "payment-return" && <PaymentReturn key={String(currentUser?.id ?? "guest")} navigate={navigate} authState={authState} onAuthRetry={() => setAuthRetry(n => n + 1)} openOrder={openOrder} openOrders={openOrders} products={products} />}
       {page === "payment-incomplete" && <PaymentIncomplete key={String(currentUser?.id ?? "guest")} userId={currentUser ? String(currentUser.id) : null} authState={authState} navigate={navigate} openOrder={openOrder} />}
@@ -1503,12 +1549,12 @@ export default function App() {
       {page === "order-detail" && <CustomerOrderDetail key={`${currentUser?.id}-${routeRevision}`} authState={authState} onAuthRetry={() => setAuthRetry(n => n + 1)} navigate={navigate} openOrders={openOrders} products={products} favorites={favorites} onAddToCart={addToCart} onToggleFavorite={toggleFavorite} onSelectProduct={handleSelectProduct} onBuyAgain={handleBuyAgain} />}
 
       {page === "checkout" && (
-        <PaymentCheckout selectedItems={directPurchase||buyAgain?.owner===String(currentUser?.id)?undefined:selectedDraft?.items} buyNow={directPurchase ? { productId: directPurchase.product.id, quantity: directPurchase.qty, intentId: directPurchase.intentId ?? "legacy" } : undefined} buyAgain={buyAgain?.owner===String(currentUser?.id)?buyAgain.items:undefined} openOrder={openOrder} openOrders={openOrders} key={String(currentUser?.id)} products={products} cart={buyAgain?.owner===String(currentUser?.id)?buyAgain.items.map(item=>({product:item.product,qty:item.quantity})):directPurchase ? [directPurchase] : (selectedDraft?cart.filter(x=>selectedDraft.items.some(i=>x.cartItemId===i.cartItemId)):cart).map(x=>({...x,product:{...x.product,weight:products.find(p=>p.id===x.product.id)?.weight??x.product.weight}}))} user={currentUser} navigate={navigate} onOrderPlaced={handleOrderPlaced} />
+        <PaymentCheckout selectedItems={directPurchase||buyAgain?.owner===String(currentUser?.id)?undefined:selectedDraft?.items} buyNow={directPurchase ? { productId: directPurchase.product.id, quantity: directPurchase.qty, intentId: directPurchase.intentId ?? "legacy" } : undefined} buyAgain={buyAgain?.owner===String(currentUser?.id)?buyAgain.items:undefined} openOrder={openOrder} openOrders={openOrders} key={String(currentUser?.id)} products={products} cart={buyAgain?.owner===String(currentUser?.id)?buyAgain.items.map(item=>({product:item.product,qty:item.quantity})):directPurchase ? [directPurchase] : (selectedDraft?cart.filter(x=>selectedDraft.items.some(i=>x.cartItemId===i.cartItemId)):cart).map(x=>({...x,product:{...x.product,weight:products.find(p=>p.id===x.product.id)?.weight??x.product.weight}}))} user={currentUser} navigate={navigateWithLoginReturn} onOrderPlaced={handleOrderPlaced} />
       )}
 
       {page === "leaf" && <LeafAnalysis />}
 
-      {page === "seller" && (authState === "loading" ? <main className="page"><p role="status">Đang xác minh phiên đăng nhập…</p></main> : authState === "error" ? <main className="page"><p role="alert">Không thể xác minh phiên đăng nhập.</p><button className="btn btn-outline" onClick={() => setAuthRetry(n => n + 1)}>Thử lại</button></main> : <SellerCenter key={String(currentUser?.id ?? "guest")} user={authState === "guest" ? null : currentUser} onLogin={() => { sessionStorage.setItem("teasmart_seller_return", "/seller"); navigate("login"); }} onShopping={() => navigate("home")} />)}
+      {page === "seller" && (authState === "loading" ? <main className="page"><p role="status">Đang xác minh phiên đăng nhập…</p></main> : authState === "error" ? <main className="page"><p role="alert">Không thể xác minh phiên đăng nhập.</p><button className="btn btn-outline" onClick={() => setAuthRetry(n => n + 1)}>Thử lại</button></main> : <SellerCenter key={String(currentUser?.id ?? "guest")} user={authState === "guest" ? null : currentUser} onLogin={() => requireLogin()} onShopping={() => navigate("home")} />)}
       {page === "account" && (
         <Account key={routeRevision} onOpenOrder={openOrder}
           favorites={favorites}
@@ -1519,7 +1565,7 @@ export default function App() {
           orders={orders}
           currentUser={currentUser}
           onLogout={handleLogout}
-          navigate={navigate}
+          navigate={navigateWithLoginReturn}
         />
       )}
 
@@ -1527,7 +1573,7 @@ export default function App() {
       {page === "policy" && <PolicyPage />}
       </div>
 
-      <ChatbotWidget productId={page === "product" ? currentProduct?.id : undefined} key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} onLogin={() => navigate("login")} onProduct={handleSelectChatProduct} openSignal={chatOpenSignal} />
+      <ChatbotWidget productId={page === "product" ? currentProduct?.id : undefined} key={String(currentUser?.id ?? "guest")} customer={currentUser?.role === "USER"} onLogin={() => requireLogin()} onProduct={handleSelectChatProduct} openSignal={chatOpenSignal} />
       {!["checkout", "admin"].includes(page) && (
         <Footer navigate={navigate} />
       )}

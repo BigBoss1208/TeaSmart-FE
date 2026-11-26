@@ -37,3 +37,25 @@ __pycache__/
 *.sql
 *.dump
 *.backup
+
+# Local-only resources and workspace snapshots
+!.env.example
+.envrc
+*.local.env
+.venv/
+.idea/
+.run/
+*.pfx
+*.p12
+*.pem
+*.key
+*.sql.gz
+*.bak
+*.pth
+*.pt
+*.onnx
+*.safetensors
+/leaf-model/
+/datasets/
+/backups/
+/BaoCaoTrienKhai/

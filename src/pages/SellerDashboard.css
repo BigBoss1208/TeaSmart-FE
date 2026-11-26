@@ -4,8 +4,6 @@
 @media(max-width:768px){.sc-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.sc-kpi{min-height:95px}.sc-kpi span{font-size:12px}.sc-chart-grid{grid-template-columns:1fr}.sc-quick{grid-template-columns:1fr 1fr}.sc-panel{padding:16px}.sc-status-body{justify-content:center}.sc-status-body ul{max-width:220px}.sc-bottom-grid{grid-template-columns:1fr}.sc-panel header{flex-wrap:wrap}.sc-panel table{min-width:550px}.sc-best table{min-width:360px}.sc-panel h2{font-size:16px}}
 /* Override inherited overview typography without affecting Admin charts. */
 .seller-center-shell .seller-overview{padding:0}
-.seller-center-shell .seller-welcome-banner h2{font-weight:700;font-size:30px;line-height:1.2;margin:6px 0 9px}
-.seller-center-shell .seller-welcome-banner p{font-size:14px;line-height:1.45;margin:0}
 .seller-center-shell .sc-kpi{padding:14px 20px;min-height:104px}
 .seller-center-shell .sc-kpi strong{font-size:27px;line-height:1.2;margin:4px 0;display:block}
 .seller-center-shell .sc-kpi small{display:block;line-height:1.4;margin:0}
@@ -15,7 +13,25 @@
 .seller-center-shell .sc-chart-note{font-size:11px;line-height:1.4;margin:6px 0 0}
 .seller-center-shell .sc-empty{margin:0;line-height:1.5}
 @media(max-width:1400px){.seller-center-shell .sc-kpi{padding:14px 12px}.seller-center-shell .sc-panel h2{font-size:15px}}
-@media(max-width:768px){.seller-center-shell .seller-welcome-banner h2{font-size:25px}.seller-center-shell .sc-kpi strong{font-size:24px}.seller-center-shell .sc-panel h2{font-size:16px}}
-.seller-center-shell .seller-welcome-banner{padding-top:16px;padding-bottom:16px}
-.seller-center-shell .sc-chart-grid>.sc-panel{padding-top:16px;padding-bottom:16px}
-.seller-center-shell .sc-revenue .admin-revenue-visual svg{height:140px}
+@media(max-width:768px){.seller-center-shell .sc-kpi strong{font-size:24px}.seller-center-shell .sc-panel h2{font-size:16px}}
+
+.seller-center-shell .sc-kpi {
+  min-height: 110px;
+  box-shadow: inset 0 0 0 1px #31614308;
+}
+.seller-center-shell .sc-kpi strong { overflow-wrap: anywhere; }
+.seller-center-shell .sc-panel {
+  background: #fffdf9;
+  border-color: #e0e8de;
+  box-shadow: 0 5px 16px #19492f07;
+}
+.seller-center-shell .sc-chart-grid > .sc-panel { padding-block: 17px; }
+.seller-center-shell .sc-quick { background: #fcfaf1; }
+.seller-center-shell .sc-quick .btn { min-height: 41px; }
+.seller-center-shell .sc-quick .btn-outline { border-color: #688975; color: #124832; }
+.seller-center-shell .sc-revenue .admin-revenue-visual svg { height: clamp(142px, 10.3vw, 175px); }
+.seller-center-shell .sc-empty { overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .seller-center-shell .sc-kpi { min-height: 94px; }
+  .seller-center-shell .sc-quick .btn { min-height: 44px; }
+}
